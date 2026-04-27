@@ -1,0 +1,194 @@
+version: '3'
+
+vars:
+  BINARY_NAME: start_point
+  BUILD_DIR: build
+  MAIN_PATH: ./cmd/main.go
+
+tasks:
+  # === Build & Run ===
+
+  build:
+    desc: Build the application binary
+    cmds:
+      - mkdir -p {{.BUILD_DIR}}
+      - go build -o {{.BUILD_DIR}}/{{.BINARY_NAME}} {{.MAIN_PATH}}
+    sources:
+      - "**/*.go"
+      - go.mod
+      - go.sum
+    generates:
+      - "{{.BUILD_DIR}}/{{.BINARY_NAME}}"
+
+  build:prod:
+    desc: Build the application with vendored dependencies (production)
+    cmds:
+      - mkdir -p {{.BUILD_DIR}}
+      - go mod vendor
+      - go build -mod=vendor -o {{.BUILD_DIR}}/{{.BINARY_NAME}} {{.MAIN_PATH}}
+
+  run:
+    desc: Run the application
+    deps: [build]
+    cmds:
+      - ./{{.BUILD_DIR}}/{{.BINARY_NAME}}
+
+  clean:
+    desc: Clean build artifacts
+    cmds:
+      - rm -rf {{.BUILD_DIR}}
+      - rm -rf vendor/
+      - go clean
+
+  # === Testing ===
+
+  test:
+    desc: Run all tests
+    cmds:
+      - go test ./... -v
+
+  test:coverage:
+    desc: Run tests with coverage report
+    cmds:
+      - mkdir -p {{.BUILD_DIR}}
+      - go test ./... -coverprofile={{.BUILD_DIR}}/coverage.out
+      - go tool cover -html={{.BUILD_DIR}}/coverage.out -o {{.BUILD_DIR}}/coverage.html
+      - echo "Coverage report generated at {{.BUILD_DIR}}/coverage.html"
+
+  test:race:
+    desc: Run tests with race detector (important for concurrent code)
+    cmds:
+      - go test ./... -race -v
+
+  # === Linting ===
+
+  lint:
+    desc: Run standard linting (recommended for daily use)
+    cmds:
+      - golangci-lint run -c .golangci.standard.yml ./...
+
+  lint:critical:
+    desc: Run CRITICAL linting only (security, errors, resource leaks)
+    cmds:
+      - golangci-lint run -c .golangci.critical.yml ./...
+
+  lint:all:
+    desc: Run ALL linters (including performance, complexity, style)
+    cmds:
+      - golangci-lint run -c .golangci.yml ./...
+
+  lint:fix:
+    desc: Run standard linting with auto-fix
+    cmds:
+      - golangci-lint run -c .golangci.standard.yml ./... --fix
+
+  lint:fix:all:
+    desc: Run all linters with auto-fix
+    cmds:
+      - golangci-lint run -c .golangci.yml ./... --fix
+
+  lint:install:
+    desc: Install golangci-lint
+    cmds:
+      - go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+
+  # === Code Quality ===
+
+  fmt:
+    desc: Format code with gofmt
+    cmds:
+      - gofmt -s -w .
+
+  fmt:imports:
+    desc: Organize imports with goimports
+    cmds:
+      - go install golang.org/x/tools/cmd/goimports@latest
+      - goimports -w .
+
+  vet:
+    desc: Run go vet
+    cmds:
+      - go vet ./...
+
+  # === Dependencies ===
+
+  deps:
+    desc: Download dependencies
+    cmds:
+      - go mod download
+
+  deps:tidy:
+    desc: Tidy dependencies
+    cmds:
+      - go mod tidy
+
+  deps:vendor:
+    desc: Vendor dependencies
+    cmds:
+      - go mod vendor
+
+  deps:update:
+    desc: Update all dependencies
+    cmds:
+      - go get -u ./...
+      - go mod tidy
+
+  # === Database Migrations ===
+
+  create_migration:*:
+    desc: Create a new database migration
+    vars:
+      NAME: '{{ index .MATCH 0}}'
+    cmds:
+      - echo "Creating migration {{.NAME}}..."
+      - tern new -m migrations/ {{.NAME}}
+      - echo "Migration '{{.NAME}}' created successfully."
+
+  # === Docker ===
+
+  docker:build:
+    desc: Build Docker image
+    cmds:
+      - docker build -t emoney-engine-core -f Dockerfile .
+
+  # === CI/CD ===
+
+  ci:
+    desc: Run all CI checks (lint, test, build)
+    cmds:
+      - task: lint
+      - task: test
+      - task: build
+
+  ci:critical:
+    desc: Run critical CI checks only (for fast feedback)
+    cmds:
+      - task: lint:critical
+      - task: test
+      - task: build
+
+  # === Development ===
+
+  dev:
+    desc: Run in development mode (with auto-rebuild on file changes)
+    deps: [build]
+    cmds:
+      - echo "Starting development mode..."
+      - ./{{.BUILD_DIR}}/{{.BINARY_NAME}}
+
+  check:
+    desc: Run all quality checks before commit
+    cmds:
+      - task: fmt
+      - task: fmt:imports
+      - task: vet
+      - task: lint
+      - task: test
+      - echo "✓ All checks passed!"
+
+  # === Help ===
+
+  default:
+    desc: Show available tasks
+    cmds:
+      - task --list

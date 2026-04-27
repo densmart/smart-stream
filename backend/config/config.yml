@@ -1,0 +1,24 @@
+# app settings
+app:
+  jwt-secret: ${JWT_SECRET|supersecret}
+
+# logger settings
+logger:
+  level: ${LOG_LEVEL|debug}
+
+# admin user settings
+admin-user:
+  login: ${ADMIN_LOGIN|admin}
+  password: ${ADMIN_PASSWORD|admin}
+
+# APIs settings
+api:
+  web:
+    port: ${WEB_API_PORT|17777}
+  tv-app:
+    port: ${TV_APP_API_PORT|18888}
+
+# database settings
+db:
+  postgres:
+    dsn: ${POSTGRES_DSN|postgres://dbuser:dbpassword@localhost:5432/dbname?sslmode=disable}
