@@ -3,6 +3,7 @@ package web
 import (
 	"github.com/densmart/smart-stream/internal/domain/repo"
 	"github.com/gin-gonic/gin"
+	"github.com/spf13/viper"
 )
 
 type WebAPIRouter struct {
@@ -38,6 +39,32 @@ func (r *WebAPIRouter) InitRoutes() *gin.Engine {
 		clients.DELETE("/:id/", r.deleteClient)
 		clients.GET("/", r.searchClients)
 	}
+
+	media := withAuth.Group("/media")
+	{
+		media.POST("/", r.createMedia)
+		media.GET("/:id/", r.retrieveMedia)
+		media.PATCH("/:id/", r.updateMedia)
+		media.DELETE("/:id/", r.deleteMedia)
+		media.GET("/", r.searchMedia)
+	}
+
+	playlists := withAuth.Group("/playlists")
+	{
+		playlists.POST("/", r.createPlaylist)
+		playlists.GET("/:id/", r.retrievePlaylist)
+		playlists.PATCH("/:id/", r.updatePlaylist)
+		playlists.DELETE("/:id/", r.deletePlaylist)
+		playlists.GET("/", r.searchPlaylists)
+	}
+
+	upload := withAuth.Group("/upload")
+	{
+		upload.POST("/poster/", r.uploadPoster)
+	}
+
+	// Static files для постеров (без авторизации для публичного доступа)
+	router.Static("/static/posters", viper.GetString("storage.posters-dir"))
 
 	return router
 }

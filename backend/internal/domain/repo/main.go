@@ -12,6 +12,8 @@ type OltpRepo interface {
 	MigrationUp() error
 	MigrationDown() error
 	Clients
+	Media
+	Playlists
 }
 
 func NewOltpRepo(ctx context.Context, DBType string) (OltpRepo, error) {

@@ -22,3 +22,8 @@ api:
 db:
   postgres:
     dsn: ${POSTGRES_DSN|postgres://dbuser:dbpassword@localhost:5432/dbname?sslmode=disable}
+
+# storage settings
+storage:
+  posters-dir: ${POSTERS_DIR|./storage/posters}
+  max-poster-size-mb: ${MAX_POSTER_SIZE_MB|10}

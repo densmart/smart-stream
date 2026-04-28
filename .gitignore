@@ -30,4 +30,5 @@ backend/vendor/*/
 backend/builds/
 # Editor/IDE
 .idea/
-# .vscode/
+# docs
+docs/
