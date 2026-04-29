@@ -15,7 +15,7 @@ admin-user:
 api:
   web:
     port: ${WEB_API_PORT|17777}
-  tv-app:
+  client:
     port: ${TV_APP_API_PORT|18888}
 
 # database settings
@@ -27,3 +27,4 @@ db:
 storage:
   posters-dir: ${POSTERS_DIR|./storage/posters}
   max-poster-size-mb: ${MAX_POSTER_SIZE_MB|10}
+  media-dir: ${MEDIA_DIR|./storage/media}

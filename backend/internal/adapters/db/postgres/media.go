@@ -435,6 +435,10 @@ func listMediaQuery(data dto.SearchMediaDTO) *goqu.SelectDataset {
 	if data.Format != nil {
 		ds = ds.Where(goqu.Ex{"format": *data.Format})
 	}
+	// Фильтр для медиа без плейлистов
+	if data.OnlyUnassigned != nil && *data.OnlyUnassigned {
+		ds = ds.Where(goqu.Ex{"playlist_id": nil})
+	}
 
 	return ds
 }

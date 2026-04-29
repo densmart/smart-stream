@@ -6,6 +6,7 @@ import (
 	"os/signal"
 	"syscall"
 
+	"github.com/densmart/smart-stream/internal/adapters/api/client"
 	"github.com/densmart/smart-stream/internal/adapters/api/web"
 	"github.com/densmart/smart-stream/internal/domain/repo"
 	"github.com/densmart/smart-stream/pkg/configger"
@@ -36,6 +37,15 @@ func main() {
 		}
 	}()
 
+	// init client API
+	clientAPIServer := client.NewClientAPIServer(client.NewClientAPIRouter(&oltpRepo).InitRoutes())
+	logger.Infof("[main] starting Client API http server -> 0.0.0.0:%s", viper.GetString("api.client.port"))
+	go func() {
+		if err = clientAPIServer.Run(); err != nil {
+			logger.Errorf("[main] error starting Client API server: %s", err.Error())
+		}
+	}()
+
 	// graceful shutdown
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGTERM, syscall.SIGINT)
@@ -50,6 +60,13 @@ func main() {
 		logger.Debugf("[main] error stopping Web API server: %s", err.Error())
 	}
 	logger.Infof("...Web API server stopped...")
+
+	// stop client API server
+	logger.Infof("...stop Client API server...")
+	if err = clientAPIServer.Stop(appCtx); err != nil {
+		logger.Debugf("[main] error stopping Client API server: %s", err.Error())
+	}
+	logger.Infof("...Client API server stopped...")
 
 	// cancel context
 	cancel()

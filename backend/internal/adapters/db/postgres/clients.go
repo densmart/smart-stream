@@ -63,7 +63,7 @@ func (dbc *PgDB) CreateClient(data dto.CreateClientDTO) (models.Client, *db.DBEr
 func (dbc *PgDB) RetrieveClient(id string) (models.Client, *db.DBError) {
 	var result models.Client
 
-	query, err := retrieveClientQuery(id)
+	query, err := retrieveClientQuery(&id, nil)
 	if err != nil {
 		logger.Debugf("[postgres] RetrieveClient error create query: %s", err.Error())
 		return result, &db.DBError{
@@ -86,6 +86,51 @@ func (dbc *PgDB) RetrieveClient(id string) (models.Client, *db.DBError) {
 	if err = row.Scan(&result.ID, &result.CreatedAt, &result.UpdatedAt, &result.Login, &result.Password, &result.Email,
 		&result.IsActive, &result.CurrentVersion, &result.LastLoginAt); err != nil {
 		logger.Debugf("[postgres] RetrieveClient error scan result: %s", err.Error())
+		code := db.DBErrorGeneral
+		if pgErr, ok := err.(*pgconn.PgError); ok {
+			code, ok = PGErrorMap[pgErr.Code]
+			if !ok {
+				code = db.DBErrorGeneral
+			}
+		}
+		if errors.Is(err, pgx.ErrNoRows) {
+			code = db.DBErrorNotFound
+		}
+		return result, &db.DBError{
+			Code:    code,
+			Message: code.String(),
+		}
+	}
+
+	return result, nil
+}
+
+func (dbc *PgDB) RetrieveClientByLogin(login string) (models.Client, *db.DBError) {
+	var result models.Client
+
+	query, err := retrieveClientQuery(nil, &login)
+	if err != nil {
+		logger.Debugf("[postgres] RetrieveClientByLogin error create query: %s", err.Error())
+		return result, &db.DBError{
+			Code:    db.DBErrorWrongInput,
+			Message: db.DBErrorWrongInput.String(),
+		}
+	}
+
+	conn, err := dbc.pool.Acquire(dbc.ctx)
+	if err != nil {
+		logger.Debugf("[postgres] RetrieveClientByLogin error acquire conn: %s", err.Error())
+		return result, &db.DBError{
+			Code:    db.DBErrorGeneral,
+			Message: db.DBErrorGeneral.String(),
+		}
+	}
+	defer conn.Release()
+
+	row := conn.QueryRow(dbc.ctx, query)
+	if err = row.Scan(&result.ID, &result.CreatedAt, &result.UpdatedAt, &result.Login, &result.Password, &result.Email,
+		&result.IsActive, &result.CurrentVersion, &result.LastLoginAt); err != nil {
+		logger.Debugf("[postgres] RetrieveClientByLogin error scan result: %s", err.Error())
 		code := db.DBErrorGeneral
 		if pgErr, ok := err.(*pgconn.PgError); ok {
 			code, ok = PGErrorMap[pgErr.Code]
@@ -314,10 +359,16 @@ func createClientQuery(data dto.CreateClientDTO) (string, error) {
 	return sql, nil
 }
 
-func retrieveClientQuery(id string) (string, error) {
+func retrieveClientQuery(id *string, login *string) (string, error) {
 	dialect := goqu.Dialect("postgres")
 	ds := dialect.Select("id", "created_at", "updated_at", "login", "password", "email", "is_active",
-		"current_version", "last_login_at").From(clientsTable).Where(goqu.Ex{"id": id})
+		"current_version", "last_login_at").From(clientsTable)
+
+	if id != nil {
+		ds = ds.Where(goqu.Ex{"id": *id})
+	} else if login != nil {
+		ds = ds.Where(goqu.Ex{"login": *login})
+	}
 
 	sql, _, err := ds.ToSQL()
 	logger.Debugf("[postgres] retrieveClientQuery: %s", sql)

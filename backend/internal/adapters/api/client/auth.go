@@ -1,4 +1,4 @@
-package web
+package client
 
 import (
 	"net/http"
@@ -8,15 +8,15 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func (r *WebAPIRouter) signIn(c *gin.Context) {
+func (r *ClientAPIRouter) signIn(c *gin.Context) {
 	var data dto.SignInRequestDTO
 	if err := c.BindJSON(&data); err != nil {
 		ErrorResponse(c, http.StatusBadRequest, "Invalid request data")
 		return
 	}
-	result, err := usecases.WebSignIn(data)
+	result, err := usecases.ClientSignIn(*r.oltp, data)
 	if err != nil {
-		ErrorResponse(c, err.HttpCode, err.Error())
+		ErrorResponse(c, err.HttpCode, err.Message)
 		return
 	}
 

@@ -9,6 +9,7 @@ import (
 type Clients interface {
 	CreateClient(data dto.CreateClientDTO) (models.Client, *db.DBError)
 	RetrieveClient(id string) (models.Client, *db.DBError)
+	RetrieveClientByLogin(login string) (models.Client, *db.DBError)
 	UpdateClient(id string, data dto.UpdateClientDTO) (models.Client, *db.DBError)
 	DeleteClient(id string) *db.DBError
 	SearchClients(data dto.SearchClientsDTO) ([]models.Client, uint64, *db.DBError)

@@ -24,10 +24,11 @@ type UpdateMediaDTO struct {
 
 type SearchMediaDTO struct {
 	BaseSearchRequestDTO
-	ID         *string `form:"id"`
-	PlaylistID *string `form:"playlist_id"`
-	Name       *string `form:"name"`
-	Format     *string `form:"format"`
+	ID             *string `form:"id"`
+	PlaylistID     *string `form:"playlist_id"`
+	Name           *string `form:"name"`
+	Format         *string `form:"format"`
+	OnlyUnassigned *bool   `form:"only_unassigned"` // Только медиа без плейлистов
 }
 
 type MediaDTO struct {
