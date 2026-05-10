@@ -140,3 +140,18 @@ func (r *WebAPIRouter) searchMedia(c *gin.Context) {
 	paginator := NewPaginator(data.BaseSearchRequestDTO, totals)
 	SuccessResponseSearch(c, results, paginator.ToRepresentation())
 }
+
+// browseMediaFiles возвращает список файлов и папок в директории media
+func (r *WebAPIRouter) browseMediaFiles(c *gin.Context) {
+	// Получаем query параметр path (может быть пустым для корневой директории)
+	path := c.DefaultQuery("path", "")
+
+	// Вызываем usecase
+	response, err := usecases.BrowseMediaFiles(path)
+	if err != nil {
+		ErrorResponse(c, err.HttpCode, err.Error())
+		return
+	}
+
+	SuccessResponse(c, http.StatusOK, response)
+}

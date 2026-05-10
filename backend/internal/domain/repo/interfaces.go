@@ -21,6 +21,10 @@ type Media interface {
 	UpdateMedia(id string, data dto.UpdateMediaDTO) (models.Media, *db.DBError)
 	DeleteMedia(id string) *db.DBError
 	SearchMedia(data dto.SearchMediaDTO) ([]models.Media, uint64, *db.DBError)
+	// Playlist media management
+	AddMediaToPlaylist(mediaID string, playlistID string, order int) *db.DBError
+	RemoveMediaFromPlaylist(mediaID string) *db.DBError
+	UpdateMediaOrder(mediaID string, order int) *db.DBError
 }
 
 type Playlists interface {

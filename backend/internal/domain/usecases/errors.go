@@ -60,10 +60,29 @@ var UCErrorCode = map[uint]string{
 	226: "Failed to save file",
 	227: "Failed to copy file content",
 
+	// Media metadata errors (230-239)
+	230: "Media file not found",
+	231: "Failed to read media file metadata",
+	232: "Unsupported media format",
+
 	// Streaming errors (240-249)
 	240: "Media not found for streaming",
 	241: "Media file not found on disk",
 	242: "Error accessing media file",
+
+	// File browser errors (250-259)
+	250: "Directory not found",
+	251: "Invalid path or path traversal attempt",
+	252: "Failed to browse directory",
+
+	// Playlist media errors (260-269)
+	260: "Failed to get playlist media",
+	261: "Failed to add media to playlist",
+	262: "Media already in playlist",
+	263: "Media already in another playlist",
+	264: "Failed to remove media from playlist",
+	265: "Media not in playlist",
+	266: "Failed to update media order",
 
 	9999: "Unknown error",
 }

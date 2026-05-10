@@ -33,3 +33,6 @@ backend/storage/
 .idea/
 # docs
 docs/
+.vscode
+storage/
+.DS_Store

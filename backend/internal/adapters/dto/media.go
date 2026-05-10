@@ -6,8 +6,8 @@ type CreateMediaDTO struct {
 	Poster     *string `json:"poster"`
 	Format     string  `json:"format" binding:"required"`
 	Path       string  `json:"path" binding:"required"`
-	Duration   int     `json:"duration" binding:"required,min=0"`
-	Size       int     `json:"size" binding:"required,min=0"`
+	Duration   *int    `json:"duration" binding:"omitempty,min=0"`
+	Size       *int    `json:"size" binding:"omitempty,min=0"`
 	Order      *int    `json:"order"`
 }
 
@@ -69,4 +69,56 @@ type PlaylistDTO struct {
 	Name      string  `json:"name"`
 	Type      string  `json:"type"`
 	Poster    *string `json:"poster"`
+}
+
+// File browser DTOs
+type FileSystemItemType string
+
+const (
+	FileSystemItemTypeFile      FileSystemItemType = "file"
+	FileSystemItemTypeDirectory FileSystemItemType = "directory"
+)
+
+type FileSystemItemDTO struct {
+	Name       string             `json:"name"`
+	Type       FileSystemItemType `json:"type"`
+	Path       string             `json:"path"`
+	Size       *int64             `json:"size,omitempty"`        // Only for files
+	Format     *string            `json:"format,omitempty"`      // Only for files
+	ModifiedAt *string            `json:"modified_at,omitempty"` // Only for files
+}
+
+type BrowseMediaFilesResponse struct {
+	CurrentPath string              `json:"current_path"`
+	ParentPath  *string             `json:"parent_path"`
+	Items       []FileSystemItemDTO `json:"items"`
+}
+
+// Playlist media DTOs
+type AddMediaToPlaylistDTO struct {
+	MediaID string `json:"media_id" binding:"required"`
+	Order   int    `json:"order" binding:"min=0"`
+}
+
+type UpdateMediaOrderDTO struct {
+	Order int `json:"order" binding:"min=0"`
+}
+
+// Batch Playlist media DTOs
+type BatchAddMediaToPlaylistDTO struct {
+	Media []struct {
+		MediaID string `json:"media_id" binding:"required"`
+		Order   int    `json:"order" binding:"min=0"`
+	} `json:"media" binding:"required,min=1,dive"`
+}
+
+type BatchRemoveMediaFromPlaylistDTO struct {
+	MediaIDs []string `json:"media_ids" binding:"required,min=1"`
+}
+
+type BatchUpdateMediaOrderDTO struct {
+	Updates []struct {
+		MediaID string `json:"media_id" binding:"required"`
+		Order   int    `json:"order" binding:"min=0"`
+	} `json:"updates" binding:"required,min=1,dive"`
 }

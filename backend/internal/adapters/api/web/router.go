@@ -18,6 +18,7 @@ func NewWebAPIRouter(oltp *repo.OltpRepo) *WebAPIRouter {
 
 func (r *WebAPIRouter) InitRoutes() *gin.Engine {
 	router := gin.New()
+	router.Use(r.cors)
 
 	router.GET("/ping", func(c *gin.Context) {
 		c.String(200, "PONG")
@@ -47,6 +48,7 @@ func (r *WebAPIRouter) InitRoutes() *gin.Engine {
 		media.PATCH("/:id/", r.updateMedia)
 		media.DELETE("/:id/", r.deleteMedia)
 		media.GET("/", r.searchMedia)
+		media.GET("/browse", r.browseMediaFiles)
 	}
 
 	playlists := withAuth.Group("/playlists")
@@ -56,6 +58,17 @@ func (r *WebAPIRouter) InitRoutes() *gin.Engine {
 		playlists.PATCH("/:id/", r.updatePlaylist)
 		playlists.DELETE("/:id/", r.deletePlaylist)
 		playlists.GET("/", r.searchPlaylists)
+
+		// Playlist media management
+		playlists.GET("/:id/media/", r.getPlaylistMedia)
+		playlists.POST("/:id/media/", r.addMediaToPlaylist)
+		playlists.DELETE("/:id/media/:media_id/", r.removeMediaFromPlaylist)
+		playlists.PATCH("/:id/media/:media_id/", r.updateMediaOrder)
+
+		// Batch playlist media management
+		playlists.POST("/:id/media/batch/", r.batchAddMediaToPlaylist)
+		playlists.DELETE("/:id/media/batch/", r.batchRemoveMediaFromPlaylist)
+		playlists.PATCH("/:id/media/batch/", r.batchUpdateMediaOrder)
 	}
 
 	upload := withAuth.Group("/upload")

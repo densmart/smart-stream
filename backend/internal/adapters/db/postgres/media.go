@@ -298,11 +298,16 @@ func createMediaQuery(data dto.CreateMediaDTO) (string, error) {
 		"name":       data.Name,
 		"format":     data.Format,
 		"path":       data.Path,
-		"duration":   data.Duration,
-		"size":       data.Size,
 		"order":      0,
 	}
 
+	// Duration и Size теперь опциональны, но должны быть заполнены в юзкейсе
+	if data.Duration != nil {
+		record["duration"] = *data.Duration
+	}
+	if data.Size != nil {
+		record["size"] = *data.Size
+	}
 	if data.PlaylistID != nil {
 		record["playlist_id"] = *data.PlaylistID
 	}
@@ -430,7 +435,8 @@ func listMediaQuery(data dto.SearchMediaDTO) *goqu.SelectDataset {
 		ds = ds.Where(goqu.Ex{"playlist_id": *data.PlaylistID})
 	}
 	if data.Name != nil {
-		ds = ds.Where(goqu.Ex{"name": *data.Name})
+		// Use ILIKE for case-insensitive partial search
+		ds = ds.Where(goqu.I("name").ILike("%" + *data.Name + "%"))
 	}
 	if data.Format != nil {
 		ds = ds.Where(goqu.Ex{"format": *data.Format})
@@ -441,4 +447,153 @@ func listMediaQuery(data dto.SearchMediaDTO) *goqu.SelectDataset {
 	}
 
 	return ds
+}
+
+// AddMediaToPlaylist добавляет медиа в плейлист
+func (dbc *PgDB) AddMediaToPlaylist(mediaID string, playlistID string, order int) *db.DBError {
+	query, err := addMediaToPlaylistQuery(mediaID, playlistID, order)
+	if err != nil {
+		logger.Debugf("[postgres] AddMediaToPlaylist error create query: %s", err.Error())
+		return &db.DBError{
+			Code:    db.DBErrorWrongInput,
+			Message: db.DBErrorWrongInput.String(),
+		}
+	}
+
+	conn, err := dbc.pool.Acquire(dbc.ctx)
+	if err != nil {
+		logger.Debugf("[postgres] AddMediaToPlaylist error acquire conn: %s", err.Error())
+		return &db.DBError{
+			Code:    db.DBErrorGeneral,
+			Message: db.DBErrorGeneral.String(),
+		}
+	}
+	defer conn.Release()
+
+	_, err = conn.Exec(dbc.ctx, query)
+	if err != nil {
+		logger.Debugf("[postgres] AddMediaToPlaylist error exec: %s", err.Error())
+		return &db.DBError{
+			Code:    db.DBErrorGeneral,
+			Message: db.DBErrorGeneral.String(),
+		}
+	}
+
+	return nil
+}
+
+// RemoveMediaFromPlaylist удаляет медиа из плейлиста
+func (dbc *PgDB) RemoveMediaFromPlaylist(mediaID string) *db.DBError {
+	query, err := removeMediaFromPlaylistQuery(mediaID)
+	if err != nil {
+		logger.Debugf("[postgres] RemoveMediaFromPlaylist error create query: %s", err.Error())
+		return &db.DBError{
+			Code:    db.DBErrorWrongInput,
+			Message: db.DBErrorWrongInput.String(),
+		}
+	}
+
+	conn, err := dbc.pool.Acquire(dbc.ctx)
+	if err != nil {
+		logger.Debugf("[postgres] RemoveMediaFromPlaylist error acquire conn: %s", err.Error())
+		return &db.DBError{
+			Code:    db.DBErrorGeneral,
+			Message: db.DBErrorGeneral.String(),
+		}
+	}
+	defer conn.Release()
+
+	_, err = conn.Exec(dbc.ctx, query)
+	if err != nil {
+		logger.Debugf("[postgres] RemoveMediaFromPlaylist error exec: %s", err.Error())
+		return &db.DBError{
+			Code:    db.DBErrorGeneral,
+			Message: db.DBErrorGeneral.String(),
+		}
+	}
+
+	return nil
+}
+
+// UpdateMediaOrder обновляет order медиа
+func (dbc *PgDB) UpdateMediaOrder(mediaID string, order int) *db.DBError {
+	query, err := updateMediaOrderQuery(mediaID, order)
+	if err != nil {
+		logger.Debugf("[postgres] UpdateMediaOrder error create query: %s", err.Error())
+		return &db.DBError{
+			Code:    db.DBErrorWrongInput,
+			Message: db.DBErrorWrongInput.String(),
+		}
+	}
+
+	conn, err := dbc.pool.Acquire(dbc.ctx)
+	if err != nil {
+		logger.Debugf("[postgres] UpdateMediaOrder error acquire conn: %s", err.Error())
+		return &db.DBError{
+			Code:    db.DBErrorGeneral,
+			Message: db.DBErrorGeneral.String(),
+		}
+	}
+	defer conn.Release()
+
+	_, err = conn.Exec(dbc.ctx, query)
+	if err != nil {
+		logger.Debugf("[postgres] UpdateMediaOrder error exec: %s", err.Error())
+		return &db.DBError{
+			Code:    db.DBErrorGeneral,
+			Message: db.DBErrorGeneral.String(),
+		}
+	}
+
+	return nil
+}
+
+func addMediaToPlaylistQuery(mediaID string, playlistID string, order int) (string, error) {
+	dialect := goqu.Dialect("postgres")
+	records := goqu.Record{
+		"updated_at":  time.Now().UTC(),
+		"playlist_id": playlistID,
+		"order":       order,
+	}
+
+	ds := dialect.Update(mediaTable).Set(records).Where(goqu.Ex{"id": mediaID})
+	sql, _, err := ds.ToSQL()
+	logger.Debugf("[postgres] addMediaToPlaylistQuery: %s", sql)
+	if err != nil {
+		return "", err
+	}
+	return sql, nil
+}
+
+func removeMediaFromPlaylistQuery(mediaID string) (string, error) {
+	dialect := goqu.Dialect("postgres")
+	records := goqu.Record{
+		"updated_at":  time.Now().UTC(),
+		"playlist_id": nil,
+		"order":       0,
+	}
+
+	ds := dialect.Update(mediaTable).Set(records).Where(goqu.Ex{"id": mediaID})
+	sql, _, err := ds.ToSQL()
+	logger.Debugf("[postgres] removeMediaFromPlaylistQuery: %s", sql)
+	if err != nil {
+		return "", err
+	}
+	return sql, nil
+}
+
+func updateMediaOrderQuery(mediaID string, order int) (string, error) {
+	dialect := goqu.Dialect("postgres")
+	records := goqu.Record{
+		"updated_at": time.Now().UTC(),
+		"order":      order,
+	}
+
+	ds := dialect.Update(mediaTable).Set(records).Where(goqu.Ex{"id": mediaID})
+	sql, _, err := ds.ToSQL()
+	logger.Debugf("[postgres] updateMediaOrderQuery: %s", sql)
+	if err != nil {
+		return "", err
+	}
+	return sql, nil
 }

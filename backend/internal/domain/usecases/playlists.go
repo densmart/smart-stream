@@ -132,3 +132,323 @@ func SearchPlaylists(oltp repo.OltpRepo, filter dto.SearchPlaylistsDTO) ([]model
 	}
 	return playlists, total, nil
 }
+
+// GetPlaylistMedia возвращает медиа плейлиста с сортировкой по order
+func GetPlaylistMedia(oltp repo.OltpRepo, playlistID string, filter dto.SearchMediaDTO) ([]models.Media, uint64, *UCError) {
+	// Проверяем существование плейлиста
+	_, dbErr := oltp.RetrievePlaylist(playlistID)
+	if dbErr != nil {
+		return nil, 0, &UCError{
+			Code:     212,
+			HttpCode: http.StatusNotFound,
+			Message:  "Playlist not found",
+		}
+	}
+
+	// Устанавливаем фильтр по playlist_id
+	filter.PlaylistID = &playlistID
+
+	// Устанавливаем сортировку по order если не указана другая
+	if filter.Order == nil {
+		orderBy := "order"
+		filter.Order = &orderBy
+	}
+
+	// Получаем медиа
+	media, total, dbErr := oltp.SearchMedia(filter)
+	if dbErr != nil {
+		return nil, 0, &UCError{
+			Code:     260,
+			HttpCode: http.StatusInternalServerError,
+		}
+	}
+
+	return media, total, nil
+}
+
+// AddMediaToPlaylist добавляет медиа в плейлист
+func AddMediaToPlaylist(oltp repo.OltpRepo, playlistID string, data dto.AddMediaToPlaylistDTO) *UCError {
+	// Проверяем существование плейлиста
+	_, dbErr := oltp.RetrievePlaylist(playlistID)
+	if dbErr != nil {
+		return &UCError{
+			Code:     212,
+			HttpCode: http.StatusNotFound,
+			Message:  "Playlist not found",
+		}
+	}
+
+	// Проверяем существование медиа
+	media, dbErr := oltp.RetrieveMedia(data.MediaID)
+	if dbErr != nil {
+		return &UCError{
+			Code:     202,
+			HttpCode: http.StatusNotFound,
+			Message:  "Media not found",
+		}
+	}
+
+	// Проверяем что медиа не в плейлисте
+	if media.PlaylistID != nil {
+		if *media.PlaylistID == playlistID {
+			return &UCError{
+				Code:     262,
+				HttpCode: http.StatusBadRequest,
+				Message:  "Media already in this playlist",
+			}
+		}
+		return &UCError{
+			Code:     263,
+			HttpCode: http.StatusBadRequest,
+			Message:  "Media already in another playlist",
+		}
+	}
+
+	// Добавляем медиа в плейлист
+	dbErr = oltp.AddMediaToPlaylist(data.MediaID, playlistID, data.Order)
+	if dbErr != nil {
+		return &UCError{
+			Code:     261,
+			HttpCode: http.StatusInternalServerError,
+		}
+	}
+
+	return nil
+}
+
+// RemoveMediaFromPlaylist удаляет медиа из плейлиста
+func RemoveMediaFromPlaylist(oltp repo.OltpRepo, playlistID string, mediaID string) *UCError {
+	// Проверяем существование плейлиста
+	_, dbErr := oltp.RetrievePlaylist(playlistID)
+	if dbErr != nil {
+		return &UCError{
+			Code:     212,
+			HttpCode: http.StatusNotFound,
+			Message:  "Playlist not found",
+		}
+	}
+
+	// Проверяем существование медиа
+	media, dbErr := oltp.RetrieveMedia(mediaID)
+	if dbErr != nil {
+		return &UCError{
+			Code:     202,
+			HttpCode: http.StatusNotFound,
+			Message:  "Media not found",
+		}
+	}
+
+	// Проверяем что медиа в плейлисте
+	if media.PlaylistID == nil || *media.PlaylistID != playlistID {
+		return &UCError{
+			Code:     265,
+			HttpCode: http.StatusBadRequest,
+			Message:  "Media not in this playlist",
+		}
+	}
+
+	// Удаляем медиа из плейлиста
+	dbErr = oltp.RemoveMediaFromPlaylist(mediaID)
+	if dbErr != nil {
+		return &UCError{
+			Code:     264,
+			HttpCode: http.StatusInternalServerError,
+		}
+	}
+
+	return nil
+}
+
+// UpdateMediaOrder обновляет order медиа в плейлисте
+func UpdateMediaOrder(oltp repo.OltpRepo, playlistID string, mediaID string, order int) *UCError {
+	// Проверяем существование плейлиста
+	_, dbErr := oltp.RetrievePlaylist(playlistID)
+	if dbErr != nil {
+		return &UCError{
+			Code:     212,
+			HttpCode: http.StatusNotFound,
+			Message:  "Playlist not found",
+		}
+	}
+
+	// Проверяем существование медиа
+	media, dbErr := oltp.RetrieveMedia(mediaID)
+	if dbErr != nil {
+		return &UCError{
+			Code:     202,
+			HttpCode: http.StatusNotFound,
+			Message:  "Media not found",
+		}
+	}
+
+	// Проверяем что медиа в плейлисте
+	if media.PlaylistID == nil || *media.PlaylistID != playlistID {
+		return &UCError{
+			Code:     265,
+			HttpCode: http.StatusBadRequest,
+			Message:  "Media not in this playlist",
+		}
+	}
+
+	// Обновляем order
+	dbErr = oltp.UpdateMediaOrder(mediaID, order)
+	if dbErr != nil {
+		return &UCError{
+			Code:     266,
+			HttpCode: http.StatusInternalServerError,
+		}
+	}
+
+	return nil
+}
+
+// BatchAddMediaToPlaylist добавляет несколько медиа в плейлист за один запрос
+func BatchAddMediaToPlaylist(oltp repo.OltpRepo, playlistID string, data dto.BatchAddMediaToPlaylistDTO) *UCError {
+	// Проверяем существование плейлиста
+	_, dbErr := oltp.RetrievePlaylist(playlistID)
+	if dbErr != nil {
+		return &UCError{
+			Code:     212,
+			HttpCode: http.StatusNotFound,
+			Message:  "Playlist not found",
+		}
+	}
+
+	// Валидируем все медиа перед добавлением
+	for _, item := range data.Media {
+		media, dbErr := oltp.RetrieveMedia(item.MediaID)
+		if dbErr != nil {
+			return &UCError{
+				Code:     202,
+				HttpCode: http.StatusNotFound,
+				Message:  "Media not found: " + item.MediaID,
+			}
+		}
+
+		// Проверяем что медиа не в плейлисте
+		if media.PlaylistID != nil {
+			if *media.PlaylistID == playlistID {
+				return &UCError{
+					Code:     262,
+					HttpCode: http.StatusBadRequest,
+					Message:  "Media already in this playlist: " + item.MediaID,
+				}
+			}
+			return &UCError{
+				Code:     263,
+				HttpCode: http.StatusBadRequest,
+				Message:  "Media already in another playlist: " + item.MediaID,
+			}
+		}
+	}
+
+	// Добавляем все медиа
+	for _, item := range data.Media {
+		dbErr = oltp.AddMediaToPlaylist(item.MediaID, playlistID, item.Order)
+		if dbErr != nil {
+			return &UCError{
+				Code:     261,
+				HttpCode: http.StatusInternalServerError,
+				Message:  "Failed to add media: " + item.MediaID,
+			}
+		}
+	}
+
+	return nil
+}
+
+// BatchRemoveMediaFromPlaylist удаляет несколько медиа из плейлиста за один запрос
+func BatchRemoveMediaFromPlaylist(oltp repo.OltpRepo, playlistID string, data dto.BatchRemoveMediaFromPlaylistDTO) *UCError {
+	// Проверяем существование плейлиста
+	_, dbErr := oltp.RetrievePlaylist(playlistID)
+	if dbErr != nil {
+		return &UCError{
+			Code:     212,
+			HttpCode: http.StatusNotFound,
+			Message:  "Playlist not found",
+		}
+	}
+
+	// Валидируем все медиа перед удалением
+	for _, mediaID := range data.MediaIDs {
+		media, dbErr := oltp.RetrieveMedia(mediaID)
+		if dbErr != nil {
+			return &UCError{
+				Code:     202,
+				HttpCode: http.StatusNotFound,
+				Message:  "Media not found: " + mediaID,
+			}
+		}
+
+		// Проверяем что медиа в плейлисте
+		if media.PlaylistID == nil || *media.PlaylistID != playlistID {
+			return &UCError{
+				Code:     265,
+				HttpCode: http.StatusBadRequest,
+				Message:  "Media not in this playlist: " + mediaID,
+			}
+		}
+	}
+
+	// Удаляем все медиа
+	for _, mediaID := range data.MediaIDs {
+		dbErr = oltp.RemoveMediaFromPlaylist(mediaID)
+		if dbErr != nil {
+			return &UCError{
+				Code:     264,
+				HttpCode: http.StatusInternalServerError,
+				Message:  "Failed to remove media: " + mediaID,
+			}
+		}
+	}
+
+	return nil
+}
+
+// BatchUpdateMediaOrder обновляет order нескольких медиа в плейлисте за один запрос
+func BatchUpdateMediaOrder(oltp repo.OltpRepo, playlistID string, data dto.BatchUpdateMediaOrderDTO) *UCError {
+	// Проверяем существование плейлиста
+	_, dbErr := oltp.RetrievePlaylist(playlistID)
+	if dbErr != nil {
+		return &UCError{
+			Code:     212,
+			HttpCode: http.StatusNotFound,
+			Message:  "Playlist not found",
+		}
+	}
+
+	// Валидируем все медиа перед обновлением
+	for _, update := range data.Updates {
+		media, dbErr := oltp.RetrieveMedia(update.MediaID)
+		if dbErr != nil {
+			return &UCError{
+				Code:     202,
+				HttpCode: http.StatusNotFound,
+				Message:  "Media not found: " + update.MediaID,
+			}
+		}
+
+		// Проверяем что медиа в плейлисте
+		if media.PlaylistID == nil || *media.PlaylistID != playlistID {
+			return &UCError{
+				Code:     265,
+				HttpCode: http.StatusBadRequest,
+				Message:  "Media not in this playlist: " + update.MediaID,
+			}
+		}
+	}
+
+	// Обновляем order для всех медиа
+	for _, update := range data.Updates {
+		dbErr = oltp.UpdateMediaOrder(update.MediaID, update.Order)
+		if dbErr != nil {
+			return &UCError{
+				Code:     266,
+				HttpCode: http.StatusInternalServerError,
+				Message:  "Failed to update media order: " + update.MediaID,
+			}
+		}
+	}
+
+	return nil
+}
