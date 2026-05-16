@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Selected state - dark text on white background -->
+    <item android:state_selected="true" android:color="#1A1A1A" />
+
+    <!-- Focused state - dark text on light gray background -->
+    <item android:state_focused="true" android:color="#1A1A1A" />
+
+    <!-- Default state - white text on transparent background -->
+    <item android:color="#FFFFFF" />
+</selector>

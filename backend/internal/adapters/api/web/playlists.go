@@ -23,11 +23,13 @@ func (r *WebAPIRouter) createPlaylist(c *gin.Context) {
 	}
 
 	result := dto.PlaylistDTO{
-		ID:        playlist.ID,
-		CreatedAt: playlist.CreatedAt.Format(time.RFC3339),
-		Name:      playlist.Name,
-		Type:      playlist.Type,
-		Poster:    playlist.Poster,
+		ID:          playlist.ID,
+		CreatedAt:   playlist.CreatedAt.Format(time.RFC3339),
+		Name:        playlist.Name,
+		Type:        playlist.Type,
+		Poster:      playlist.Poster,
+		ParentID:    playlist.ParentID,
+		HasChildren: playlist.HasChildren,
 	}
 
 	SuccessResponse(c, http.StatusCreated, result)
@@ -43,11 +45,13 @@ func (r *WebAPIRouter) retrievePlaylist(c *gin.Context) {
 	}
 
 	result := dto.PlaylistDTO{
-		ID:        playlist.ID,
-		CreatedAt: playlist.CreatedAt.Format(time.RFC3339),
-		Name:      playlist.Name,
-		Type:      playlist.Type,
-		Poster:    playlist.Poster,
+		ID:          playlist.ID,
+		CreatedAt:   playlist.CreatedAt.Format(time.RFC3339),
+		Name:        playlist.Name,
+		Type:        playlist.Type,
+		Poster:      playlist.Poster,
+		ParentID:    playlist.ParentID,
+		HasChildren: playlist.HasChildren,
 	}
 
 	SuccessResponse(c, http.StatusOK, result)
@@ -69,11 +73,13 @@ func (r *WebAPIRouter) updatePlaylist(c *gin.Context) {
 	}
 
 	result := dto.PlaylistDTO{
-		ID:        playlist.ID,
-		CreatedAt: playlist.CreatedAt.Format(time.RFC3339),
-		Name:      playlist.Name,
-		Type:      playlist.Type,
-		Poster:    playlist.Poster,
+		ID:          playlist.ID,
+		CreatedAt:   playlist.CreatedAt.Format(time.RFC3339),
+		Name:        playlist.Name,
+		Type:        playlist.Type,
+		Poster:      playlist.Poster,
+		ParentID:    playlist.ParentID,
+		HasChildren: playlist.HasChildren,
 	}
 
 	SuccessResponse(c, http.StatusOK, result)
@@ -108,11 +114,13 @@ func (r *WebAPIRouter) searchPlaylists(c *gin.Context) {
 	var results []dto.PlaylistDTO
 	for _, item := range playlists {
 		result := dto.PlaylistDTO{
-			ID:        item.ID,
-			CreatedAt: item.CreatedAt.Format(time.RFC3339),
-			Name:      item.Name,
-			Type:      item.Type,
-			Poster:    item.Poster,
+			ID:          item.ID,
+			CreatedAt:   item.CreatedAt.Format(time.RFC3339),
+			Name:        item.Name,
+			Type:        item.Type,
+			Poster:      item.Poster,
+			ParentID:    item.ParentID,
+			HasChildren: item.HasChildren,
 		}
 		results = append(results, result)
 	}
@@ -266,4 +274,22 @@ func (r *WebAPIRouter) batchUpdateMediaOrder(c *gin.Context) {
 	}
 
 	SuccessResponse(c, http.StatusOK, nil)
+}
+
+// searchPlaylistsAutocomplete searches playlists for autocomplete (returns only id and name, limit 50)
+func (r *WebAPIRouter) searchPlaylistsAutocomplete(c *gin.Context) {
+	var filter dto.PlaylistSearchDTO
+
+	if err := c.BindQuery(&filter); err != nil {
+		ErrorResponse(c, http.StatusBadRequest, "Invalid query parameters")
+		return
+	}
+
+	results, err := usecases.SearchPlaylistsAutocomplete(*r.oltp, filter)
+	if err != nil {
+		ErrorResponse(c, err.HttpCode, err.Error())
+		return
+	}
+
+	c.JSON(http.StatusOK, results)
 }

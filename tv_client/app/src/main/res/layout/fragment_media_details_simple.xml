@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="horizontal"
+    android:background="@color/dark_background"
+    android:padding="@dimen/tv_padding_large"
+    android:gravity="center_vertical">
+
+    <!-- Poster Left -->
+    <androidx.cardview.widget.CardView
+        android:layout_width="@dimen/detail_poster_width"
+        android:layout_height="@dimen/detail_poster_height"
+        app:cardCornerRadius="16dp"
+        app:cardElevation="0dp"
+        app:cardBackgroundColor="#2A2A2A">
+
+        <ImageView
+            android:id="@+id/media_poster"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:scaleType="centerCrop"
+            android:src="@drawable/ic_media_placeholder"
+            android:contentDescription="@string/media_loading" />
+    </androidx.cardview.widget.CardView>
+
+    <!-- Content Right -->
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:orientation="vertical"
+        android:layout_marginStart="@dimen/tv_margin_xlarge"
+        android:gravity="center_vertical">
+
+        <!-- Title -->
+        <TextView
+            android:id="@+id/media_title"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Media Title"
+            android:textColor="@color/text_primary"
+            android:textSize="36sp"
+            android:textStyle="bold"
+            android:maxLines="2"
+            android:ellipsize="end" />
+
+        <!-- Duration -->
+        <TextView
+            android:id="@+id/media_duration"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/tv_margin_medium"
+            android:text="Duration: 00:00"
+            android:textColor="@color/text_gray"
+            android:textSize="@dimen/tv_text_size_medium" />
+
+        <!-- Buttons Container -->
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/tv_margin_large"
+            android:orientation="horizontal">
+
+            <!-- Play Button -->
+            <Button
+                android:id="@+id/btn_play"
+                android:layout_width="@dimen/play_button_width"
+                android:layout_height="@dimen/play_button_height"
+                android:text="@string/play"
+                android:textColor="@color/dark_background"
+                android:textSize="@dimen/tv_text_size_medium"
+                android:textStyle="bold"
+                android:background="@drawable/button_play_selector"
+                android:gravity="center"
+                android:focusable="true" />
+
+            <!-- Continue Button -->
+            <Button
+                android:id="@+id/btn_continue"
+                android:layout_width="@dimen/play_button_width"
+                android:layout_height="@dimen/play_button_height"
+                android:layout_marginStart="@dimen/tv_margin_medium"
+                android:text="CONTINUE"
+                android:textColor="@color/dark_background"
+                android:textSize="@dimen/tv_text_size_medium"
+                android:textStyle="bold"
+                android:background="@drawable/button_continue_selector"
+                android:gravity="center"
+                android:focusable="true"
+                android:visibility="gone" />
+        </LinearLayout>
+    </LinearLayout>
+</LinearLayout>

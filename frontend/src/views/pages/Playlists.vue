@@ -19,11 +19,20 @@ const selectedPlaylist = ref(null);
 const selectedPosterUrl = ref(null);
 const uploadingPoster = ref(false);
 
+// Hierarchy navigation
+const currentParentId = ref(null);
+const breadcrumbs = ref([{ label: 'All Playlists', id: null }]);
+
+// Parent playlist autocomplete
+const loadingPlaylists = ref(false);
+const filteredPlaylists = ref([]);
+
 // Form data
 const formData = ref({
     name: '',
     type: PlaylistType.SERIES,
-    poster: null
+    poster: null,
+    parent_id: null
 });
 
 // Poster preview
@@ -51,18 +60,26 @@ const lazyParams = ref({
 // Playlist type options
 const typeOptions = [
     { label: 'Series', value: PlaylistType.SERIES },
-    { label: 'Franchise', value: PlaylistType.FRANCHISE }
+    { label: 'Franchise', value: PlaylistType.FRANCHISE },
+    { label: 'Season', value: PlaylistType.SEASON }
 ];
 
 // Methods
 const loadPlaylists = async () => {
     try {
         loading.value = true;
-        const response = await playlistsApi.getPlaylists({
+        const params = {
             page: lazyParams.value.page,
             limit: lazyParams.value.limit,
             search: lazyParams.value.search || undefined
-        });
+        };
+
+        // Add parent_id filter if we're viewing children
+        if (currentParentId.value) {
+            params.parent_id = currentParentId.value;
+        }
+
+        const response = await playlistsApi.getPlaylists(params);
         playlists.value = response.result;
         totalRecords.value = response.pagination.total;
     } catch (error) {
@@ -83,25 +100,75 @@ const onPage = (event) => {
     loadPlaylists();
 };
 
+// Hierarchy navigation methods
+const viewChildren = (playlist) => {
+    currentParentId.value = playlist.id;
+    breadcrumbs.value.push({ label: playlist.name, id: playlist.id });
+    lazyParams.value.page = 1;
+    loadPlaylists();
+};
+
+const navigateToBreadcrumb = (index) => {
+    const breadcrumb = breadcrumbs.value[index];
+    currentParentId.value = breadcrumb.id;
+    breadcrumbs.value = breadcrumbs.value.slice(0, index + 1);
+    lazyParams.value.page = 1;
+    loadPlaylists();
+};
+
+// Autocomplete search using new API endpoint
+const searchPlaylists = async (event) => {
+    try {
+        loadingPlaylists.value = true;
+        const query = event.query;
+        // Call new search API endpoint with name parameter
+        const results = await playlistsApi.searchPlaylists(query || undefined);
+        filteredPlaylists.value = results;
+    } catch (error) {
+        toast.add({
+            severity: 'error',
+            summary: 'Error',
+            detail: 'Failed to search playlists',
+            life: 3000
+        });
+        filteredPlaylists.value = [];
+    } finally {
+        loadingPlaylists.value = false;
+    }
+};
+
 const openCreateDialog = () => {
     isEditMode.value = false;
     formData.value = {
         name: '',
         type: PlaylistType.SERIES,
-        poster: null
+        poster: null,
+        parent_id: null
     };
     posterFile.value = null;
     posterPreviewUrl.value = null;
     displayDialog.value = true;
 };
 
-const openEditDialog = (playlist) => {
+const openEditDialog = async (playlist) => {
     isEditMode.value = true;
     selectedPlaylist.value = playlist;
+
+    // Load parent playlist object if parent_id is set
+    let parentPlaylist = null;
+    if (playlist.parent_id) {
+        try {
+            parentPlaylist = await playlistsApi.getPlaylist(playlist.parent_id);
+        } catch (error) {
+            console.error('Failed to load parent playlist:', error);
+        }
+    }
+
     formData.value = {
         name: playlist.name,
         type: playlist.type,
-        poster: playlist.poster
+        poster: playlist.poster,
+        parent_id: parentPlaylist || null
     };
     posterFile.value = null;
     posterPreviewUrl.value = playlist.poster ? uploadApi.getPosterUrl(playlist.poster) : null;
@@ -174,6 +241,9 @@ const savePlaylist = async () => {
                 updateData.poster = posterPath;
             }
 
+            // Extract parent_id (can be object or null)
+            updateData.parent_id = formData.value.parent_id?.id || null;
+
             await playlistsApi.updatePlaylist(selectedPlaylist.value.id, updateData);
             toast.add({
                 severity: 'success',
@@ -185,7 +255,8 @@ const savePlaylist = async () => {
             await playlistsApi.createPlaylist({
                 name: formData.value.name,
                 type: formData.value.type,
-                poster: posterPath
+                poster: posterPath,
+                parent_id: formData.value.parent_id?.id || null
             });
             toast.add({
                 severity: 'success',
@@ -272,6 +343,17 @@ const loadAvailableMedia = async () => {
 };
 
 const openMediaDialog = async (playlist) => {
+    // Check if playlist has children
+    if (playlist.has_children) {
+        toast.add({
+            severity: 'warn',
+            summary: 'Cannot Manage Media',
+            detail: 'Media can only be added to playlists without children. This playlist contains child playlists.',
+            life: 5000
+        });
+        return;
+    }
+
     selectedPlaylist.value = playlist;
     selectedMediaToAdd.value = [];
     selectedMediaToRemove.value = [];
@@ -470,6 +552,8 @@ const getTypeSeverity = (type) => {
             return 'success';
         case PlaylistType.FRANCHISE:
             return 'info';
+        case PlaylistType.SEASON:
+            return 'warn';
         default:
             return 'secondary';
     }
@@ -494,6 +578,14 @@ onMounted(() => {
         <div class="flex justify-between items-center mb-6">
             <h5 class="mb-0">Playlists Management</h5>
             <Button label="Add Playlist" icon="pi pi-plus" @click="openCreateDialog" />
+        </div>
+
+        <!-- Breadcrumb Navigation -->
+        <div v-if="breadcrumbs.length > 1" class="mb-4">
+            <Breadcrumb :model="breadcrumbs.map((bc, idx) => ({
+                label: bc.label,
+                command: () => navigateToBreadcrumb(idx)
+            }))" />
         </div>
 
         <!-- Grid View -->
@@ -533,6 +625,17 @@ onMounted(() => {
                             @click="openEditDialog(playlist)"
                         />
                         <Button
+                            v-if="playlist.has_children"
+                            icon="pi pi-folder-open"
+                            outlined
+                            rounded
+                            severity="success"
+                            size="small"
+                            @click="viewChildren(playlist)"
+                            title="View Children"
+                        />
+                        <Button
+                            v-else
                             icon="pi pi-video"
                             outlined
                             rounded
@@ -612,6 +715,27 @@ onMounted(() => {
                         placeholder="Select a type"
                         :class="{ 'p-invalid': !formData.type }"
                     />
+                </div>
+
+                <div class="flex flex-col gap-2">
+                    <label for="parent">Parent Playlist (optional)</label>
+                    <AutoComplete
+                        id="parent"
+                        v-model="formData.parent_id"
+                        :suggestions="filteredPlaylists"
+                        @complete="searchPlaylists"
+                        optionLabel="name"
+                        placeholder="Search parent playlist..."
+                        :loading="loadingPlaylists"
+                    >
+                        <template #option="slotProps">
+                            <div class="flex items-center gap-2">
+                                <i class="pi pi-list text-surface-500"></i>
+                                <span>{{ slotProps.option.name }}</span>
+                            </div>
+                        </template>
+                    </AutoComplete>
+                    <small class="text-muted-color">Leave empty to make this a root-level playlist</small>
                 </div>
 
                 <div class="flex flex-col gap-2">

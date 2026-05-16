@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="600dp"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:background="@color/tv_card_background"
+    android:padding="@dimen/tv_padding_large">
+
+    <!-- Title -->
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="@string/settings_title"
+        android:textColor="@color/text_primary"
+        android:textSize="@dimen/tv_text_size_xlarge"
+        android:textStyle="bold"
+        android:gravity="center"
+        android:layout_marginBottom="@dimen/tv_margin_large" />
+
+    <!-- Host Label -->
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="@string/settings_host_label"
+        android:textColor="@color/text_secondary"
+        android:textSize="@dimen/tv_text_size_medium"
+        android:layout_marginBottom="@dimen/tv_margin_small" />
+
+    <!-- Host Input -->
+    <EditText
+        android:id="@+id/edit_host"
+        android:layout_width="match_parent"
+        android:layout_height="@dimen/input_height"
+        android:hint="@string/settings_host_hint"
+        android:inputType="text"
+        android:textColor="@color/text_primary"
+        android:textColorHint="@color/text_disabled"
+        android:background="@drawable/edittext_focused"
+        android:padding="@dimen/tv_padding_medium"
+        android:layout_marginBottom="@dimen/tv_margin_medium" />
+
+    <!-- Port Label -->
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="@string/settings_port_label"
+        android:textColor="@color/text_secondary"
+        android:textSize="@dimen/tv_text_size_medium"
+        android:layout_marginBottom="@dimen/tv_margin_small" />
+
+    <!-- Port Input -->
+    <EditText
+        android:id="@+id/edit_port"
+        android:layout_width="match_parent"
+        android:layout_height="@dimen/input_height"
+        android:hint="@string/settings_port_hint"
+        android:inputType="number"
+        android:textColor="@color/text_primary"
+        android:textColorHint="@color/text_disabled"
+        android:background="@drawable/edittext_focused"
+        android:padding="@dimen/tv_padding_medium"
+        android:layout_marginBottom="@dimen/tv_margin_large" />
+
+    <!-- Buttons -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center">
+
+        <Button
+            android:id="@+id/btn_cancel"
+            android:layout_width="0dp"
+            android:layout_height="@dimen/button_height"
+            android:layout_weight="1"
+            android:text="@string/cancel"
+            android:textColor="@color/text_primary"
+            android:textSize="@dimen/tv_text_size_medium"
+            android:background="@drawable/button_focused"
+            android:layout_marginEnd="@dimen/tv_margin_small" />
+
+        <Button
+            android:id="@+id/btn_save"
+            android:layout_width="0dp"
+            android:layout_height="@dimen/button_height"
+            android:layout_weight="1"
+            android:text="@string/settings_save"
+            android:textColor="@color/dark_background"
+            android:textSize="@dimen/tv_text_size_medium"
+            android:background="@drawable/button_play_selector"
+            android:layout_marginStart="@dimen/tv_margin_small" />
+    </LinearLayout>
+</LinearLayout>

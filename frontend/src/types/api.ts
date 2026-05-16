@@ -75,7 +75,8 @@ export interface UpdateMediaRequest {
 // Playlist types
 export enum PlaylistType {
   SERIES = 'series',
-  FRANCHISE = 'franchise'
+  FRANCHISE = 'franchise',
+  SEASON = 'season'
 }
 
 export interface Playlist {
@@ -83,6 +84,8 @@ export interface Playlist {
   name: string
   type: PlaylistType
   poster: string | null
+  parent_id?: string | null
+  has_children: boolean
   created_at: string
   updated_at: string
 }
@@ -91,12 +94,14 @@ export interface CreatePlaylistRequest {
   name: string
   type: PlaylistType
   poster?: string
+  parent_id?: string
 }
 
 export interface UpdatePlaylistRequest {
   name?: string
   type?: PlaylistType
   poster?: string
+  parent_id?: string
 }
 
 // API Response types

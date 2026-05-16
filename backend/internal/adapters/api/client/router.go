@@ -3,6 +3,7 @@ package client
 import (
 	"github.com/densmart/smart-stream/internal/domain/repo"
 	"github.com/gin-gonic/gin"
+	"github.com/spf13/viper"
 )
 
 type ClientAPIRouter struct {
@@ -33,8 +34,12 @@ func (r *ClientAPIRouter) InitRoutes() *gin.Engine {
 		withAuth.GET("/media/", r.getUnassignedMedia)
 		withAuth.GET("/media/:id/stream/", r.streamMedia)
 		withAuth.GET("/playlists/", r.getPlaylists)
+		withAuth.GET("/playlists/:id/children/", r.getPlaylistChildren)
 		withAuth.GET("/playlists/:id/media/", r.getPlaylistMedia)
 	}
+
+	// Static files для постеров (без авторизации для публичного доступа)
+	router.Static("/static/posters", viper.GetString("storage.posters-dir"))
 
 	return router
 }

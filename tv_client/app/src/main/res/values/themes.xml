@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Base TV Theme -->
+    <style name="Theme.SmartStreamTV" parent="Theme.Leanback">
+        <!-- Primary colors -->
+        <item name="colorPrimary">@color/primary</item>
+        <item name="colorPrimaryDark">@color/primary_dark</item>
+        <item name="colorAccent">@color/accent</item>
+
+        <!-- Background -->
+        <item name="android:windowBackground">@color/tv_background</item>
+        <item name="android:colorBackground">@color/tv_background</item>
+
+        <!-- Text colors -->
+        <item name="android:textColorPrimary">@color/text_primary</item>
+        <item name="android:textColorSecondary">@color/text_secondary</item>
+
+        <!-- No action bar -->
+        <item name="windowActionBar">false</item>
+        <item name="windowNoTitle">true</item>
+
+        <!-- Fullscreen -->
+        <item name="android:windowFullscreen">true</item>
+    </style>
+
+    <!-- Browse Fragment Theme -->
+    <style name="Theme.SmartStreamTV.Browse" parent="Theme.SmartStreamTV">
+        <item name="browsePaddingStart">@dimen/tv_margin_xlarge</item>
+        <item name="browsePaddingEnd">@dimen/tv_margin_xlarge</item>
+        <item name="browsePaddingTop">@dimen/tv_margin_large</item>
+        <item name="browsePaddingBottom">@dimen/tv_margin_large</item>
+        <item name="browseRowsMarginTop">@dimen/tv_margin_medium</item>
+        <item name="browseRowsMarginStart">@dimen/tv_margin_medium</item>
+    </style>
+
+    <!-- Details Fragment Theme -->
+    <style name="Theme.SmartStreamTV.Details" parent="Theme.SmartStreamTV">
+        <item name="detailsDescriptionTitleStyle">@style/Widget.SmartStream.DetailsDescriptionTitle</item>
+        <item name="detailsDescriptionSubtitleStyle">@style/Widget.SmartStream.DetailsDescriptionSubtitle</item>
+        <item name="detailsDescriptionBodyStyle">@style/Widget.SmartStream.DetailsDescriptionBody</item>
+    </style>
+
+    <!-- Widget Styles -->
+    <style name="Widget.SmartStream.DetailsDescriptionTitle" parent="Widget.Leanback.DetailsDescriptionTitleStyle">
+        <item name="android:textSize">@dimen/tv_text_size_xlarge</item>
+        <item name="android:textColor">@color/text_primary</item>
+    </style>
+
+    <style name="Widget.SmartStream.DetailsDescriptionSubtitle" parent="Widget.Leanback.DetailsDescriptionSubtitleStyle">
+        <item name="android:textSize">@dimen/tv_text_size_medium</item>
+        <item name="android:textColor">@color/text_secondary</item>
+    </style>
+
+    <style name="Widget.SmartStream.DetailsDescriptionBody" parent="Widget.Leanback.DetailsDescriptionBodyStyle">
+        <item name="android:textSize">@dimen/tv_text_size_small</item>
+        <item name="android:textColor">@color/text_secondary</item>
+    </style>
+</resources>

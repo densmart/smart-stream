@@ -54,6 +54,7 @@ func (r *WebAPIRouter) InitRoutes() *gin.Engine {
 	playlists := withAuth.Group("/playlists")
 	{
 		playlists.POST("/", r.createPlaylist)
+		playlists.GET("/search/", r.searchPlaylistsAutocomplete)
 		playlists.GET("/:id/", r.retrievePlaylist)
 		playlists.PATCH("/:id/", r.updatePlaylist)
 		playlists.DELETE("/:id/", r.deletePlaylist)

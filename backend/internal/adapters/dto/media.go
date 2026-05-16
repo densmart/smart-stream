@@ -45,30 +45,46 @@ type MediaDTO struct {
 }
 
 type CreatePlaylistDTO struct {
-	Name   string  `json:"name" binding:"required"`
-	Type   string  `json:"type" binding:"required"`
-	Poster *string `json:"poster"`
+	Name     string  `json:"name" binding:"required"`
+	Type     string  `json:"type" binding:"required"`
+	Poster   *string `json:"poster"`
+	ParentID *string `json:"parent_id"`
 }
 
 type UpdatePlaylistDTO struct {
-	Name   *string `json:"name"`
-	Type   *string `json:"type"`
-	Poster *string `json:"poster"`
+	Name     *string `json:"name"`
+	Type     *string `json:"type"`
+	Poster   *string `json:"poster"`
+	ParentID *string `json:"parent_id"`
 }
 
 type SearchPlaylistsDTO struct {
 	BaseSearchRequestDTO
-	ID   *string `form:"id"`
-	Name *string `form:"name"`
-	Type *string `form:"type"`
+	ID                 *string `form:"id"`
+	Name               *string `form:"name"`
+	Type               *string `form:"type"`
+	ParentID           *string `form:"parent_id"`
+	IncludeAllHierarchy *bool   `form:"include_all_hierarchy"` // If true, load all playlists regardless of parent_id
 }
 
 type PlaylistDTO struct {
-	ID        string  `json:"id"`
-	CreatedAt string  `json:"created_at"`
-	Name      string  `json:"name"`
-	Type      string  `json:"type"`
-	Poster    *string `json:"poster"`
+	ID          string  `json:"id"`
+	CreatedAt   string  `json:"created_at"`
+	Name        string  `json:"name"`
+	Type        string  `json:"type"`
+	Poster      *string `json:"poster"`
+	ParentID    *string `json:"parent_id"`
+	HasChildren bool    `json:"has_children"`
+}
+
+// Playlist search autocomplete
+type PlaylistSearchDTO struct {
+	Name *string `form:"name"`
+}
+
+type PlaylistSearchResultDTO struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
 }
 
 // File browser DTOs

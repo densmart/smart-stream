@@ -33,4 +33,5 @@ type Playlists interface {
 	UpdatePlaylist(id string, data dto.UpdatePlaylistDTO) (models.Playlist, *db.DBError)
 	DeletePlaylist(id string) *db.DBError
 	SearchPlaylists(data dto.SearchPlaylistsDTO) ([]models.Playlist, uint64, *db.DBError)
+	UpdateParentHasChildren(parentID string) *db.DBError
 }

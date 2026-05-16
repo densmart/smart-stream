@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<full-backup-content>
+    <!--
+       Include or exclude specific files/folders during backup.
+       By default, all app data is backed up.
+    -->
+    <exclude domain="sharedpref" path="jwt_prefs.xml"/>
+</full-backup-content>

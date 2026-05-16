@@ -83,6 +83,7 @@ var UCErrorCode = map[uint]string{
 	264: "Failed to remove media from playlist",
 	265: "Media not in playlist",
 	266: "Failed to update media order",
+	267: "Cannot add media to playlist with children",
 
 	9999: "Unknown error",
 }

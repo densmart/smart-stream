@@ -84,11 +84,8 @@ const navigateToBreadcrumb = (path) => {
 
 const confirmSelection = () => {
     if (canSelectFile.value) {
-        // Добавляем слеш в начало пути
-        const filePath = selectedFile.value.path.startsWith('/')
-            ? selectedFile.value.path
-            : '/' + selectedFile.value.path;
-        emit('update:modelValue', filePath);
+        // Используем путь как есть (относительный путь без начального слеша)
+        emit('update:modelValue', selectedFile.value.path);
         closeDialog();
     }
 };

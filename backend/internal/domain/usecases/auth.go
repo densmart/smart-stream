@@ -57,7 +57,8 @@ func ClientSignIn(oltp repo.OltpRepo, data dto.SignInRequestDTO) (*dto.AuthRespo
 	}
 
 	// Проверка пароля
-	if !utils.CheckPasswordHash(data.Password, client.Password) {
+	if !utils.CheckPasswordHash(client.Password, data.Password) {
+		logger.Debugf("Invalid password")
 		return nil, &UCError{
 			Code:     101,
 			HttpCode: http.StatusUnauthorized,

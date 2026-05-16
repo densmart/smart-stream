@@ -1,6 +1,6 @@
 <script setup>
 import { ref, onMounted, computed } from 'vue';
-import { mediaApi, uploadApi } from '@/api';
+import { mediaApi, uploadApi, playlistsApi } from '@/api';
 import { useToast } from 'primevue/usetoast';
 import FileBrowser from '@/components/FileBrowser.vue';
 
@@ -16,6 +16,11 @@ const isEditMode = ref(false);
 const selectedMedia = ref(null);
 const uploadingPoster = ref(false);
 const showFileBrowser = ref(false);
+
+// Filter by playlist
+const filteredPlaylists = ref([]);
+const selectedPlaylist = ref(null);
+const loadingPlaylists = ref(false);
 
 // Form data
 const formData = ref({
@@ -56,11 +61,20 @@ const formatOptions = [
 const loadMedia = async () => {
     try {
         loading.value = true;
-        const response = await mediaApi.getMedia({
+        const params = {
             page: lazyParams.value.page,
             limit: lazyParams.value.limit,
             search: lazyParams.value.search || undefined
-        });
+        };
+
+        // Filter by playlist or show only unassigned
+        if (selectedPlaylist.value) {
+            params.playlist_id = selectedPlaylist.value.id;
+        } else {
+            params.only_unassigned = true;
+        }
+
+        const response = await mediaApi.getMedia(params);
         mediaList.value = response.result;
         totalRecords.value = response.pagination.total;
     } catch (error) {
@@ -73,6 +87,39 @@ const loadMedia = async () => {
     } finally {
         loading.value = false;
     }
+};
+
+// Autocomplete search for playlists using new API endpoint
+const searchPlaylistsForFilter = async (event) => {
+    try {
+        loadingPlaylists.value = true;
+        const query = event.query;
+        // Call new search API endpoint with name parameter
+        const results = await playlistsApi.searchPlaylists(query || undefined);
+        filteredPlaylists.value = results;
+    } catch (error) {
+        toast.add({
+            severity: 'error',
+            summary: 'Error',
+            detail: 'Failed to search playlists',
+            life: 3000
+        });
+        filteredPlaylists.value = [];
+    } finally {
+        loadingPlaylists.value = false;
+    }
+};
+
+// Apply playlist filter
+const applyPlaylistFilter = () => {
+    lazyParams.value.page = 1;
+    loadMedia();
+};
+
+// Clear playlist filter
+const clearPlaylistFilter = () => {
+    selectedPlaylist.value = null;
+    applyPlaylistFilter();
 };
 
 const onPage = (event) => {
@@ -319,6 +366,49 @@ onMounted(() => {
         <div class="flex justify-between items-center mb-6">
             <h5 class="mb-0">Media Management</h5>
             <Button label="Add Media" icon="pi pi-plus" @click="openCreateDialog" />
+        </div>
+
+        <!-- Filter by Playlist -->
+        <div class="mb-4">
+            <div class="flex items-center">
+                <div class="relative inline-block">
+                    <AutoComplete
+                        id="playlistFilter"
+                        v-model="selectedPlaylist"
+                        :suggestions="filteredPlaylists"
+                        @complete="searchPlaylistsForFilter"
+                        optionLabel="name"
+                        placeholder="Filter by playlist"
+                        :loading="loadingPlaylists"
+                        :inputStyle="{ width: '24rem', paddingRight: selectedPlaylist ? '2.5rem' : '0.75rem' }"
+                    >
+                        <template #option="slotProps">
+                            <div class="flex items-center gap-2">
+                                <i class="pi pi-list text-surface-500"></i>
+                                <span>{{ slotProps.option.name }}</span>
+                            </div>
+                        </template>
+                    </AutoComplete>
+                    <Button
+                        v-if="selectedPlaylist"
+                        icon="pi pi-times"
+                        text
+                        rounded
+                        severity="secondary"
+                        @click="clearPlaylistFilter"
+                        title="Clear filter"
+                        class="!absolute"
+                        style="right: 0.25rem; top: 50%; transform: translateY(-50%); width: 2rem; height: 2rem; z-index: 10;"
+                    />
+                </div>
+                <Button
+                    icon="pi pi-filter"
+                    label="Filter"
+                    @click="applyPlaylistFilter"
+                    title="Apply filter"
+                    class="ml-2"
+                />
+            </div>
         </div>
 
         <!-- Grid View -->

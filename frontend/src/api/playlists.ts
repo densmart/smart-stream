@@ -14,6 +14,8 @@ export const playlistsApi = {
     limit?: number
     search?: string
     type?: string
+    parent_id?: string
+    include_all_hierarchy?: boolean
   }): Promise<PaginatedResponse<Playlist>> => {
     const response = await apiClient.get<PaginatedResponse<Playlist>>('/playlists/', { params })
     return response.data
@@ -22,6 +24,16 @@ export const playlistsApi = {
   getPlaylist: async (id: string): Promise<Playlist> => {
     const response = await apiClient.get<ApiResponse<Playlist>>(`/playlists/${id}/`)
     return response.data.result
+  },
+
+  getPlaylistChildren: async (
+    id: string,
+    params?: { page?: number; limit?: number; search?: string }
+  ): Promise<PaginatedResponse<Playlist>> => {
+    const response = await apiClient.get<PaginatedResponse<Playlist>>(`/playlists/${id}/children/`, {
+      params
+    })
+    return response.data
   },
 
   createPlaylist: async (data: CreatePlaylistRequest): Promise<Playlist> => {
@@ -84,5 +96,13 @@ export const playlistsApi = {
     await apiClient.patch(`/playlists/${playlistId}/media/batch/`, {
       updates: updates.map((u) => ({ media_id: u.mediaId, order: u.order }))
     })
+  },
+
+  // Autocomplete search
+  searchPlaylists: async (name?: string): Promise<Array<{ id: string; name: string }>> => {
+    const response = await apiClient.get<Array<{ id: string; name: string }>>('/playlists/search/', {
+      params: name ? { name } : undefined
+    })
+    return response.data
   }
 }

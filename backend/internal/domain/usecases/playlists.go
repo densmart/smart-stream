@@ -7,6 +7,7 @@ import (
 	"github.com/densmart/smart-stream/internal/adapters/dto"
 	"github.com/densmart/smart-stream/internal/domain/models"
 	"github.com/densmart/smart-stream/internal/domain/repo"
+	"github.com/densmart/smart-stream/internal/domain/utils"
 )
 
 func CreatePlaylist(oltp repo.OltpRepo, data dto.CreatePlaylistDTO) (*models.Playlist, *UCError) {
@@ -89,7 +90,7 @@ func UpdatePlaylist(oltp repo.OltpRepo, id string, data dto.UpdatePlaylistDTO) (
 }
 
 func DeletePlaylist(oltp repo.OltpRepo, id string) *UCError {
-	// Получаем запись перед удалением чтобы удалить постер
+	// Получаем запись перед удалением чтобы удалить постер и обновить родителя
 	playlist, dbErr := oltp.RetrievePlaylist(id)
 	if dbErr != nil {
 		if dbErr.Code == db.DBErrorNotFound {
@@ -119,6 +120,15 @@ func DeletePlaylist(oltp repo.OltpRepo, id string) *UCError {
 			HttpCode: http.StatusInternalServerError,
 		}
 	}
+
+	// Обновляем has_children у родителя если он был
+	if playlist.ParentID != nil {
+		if dbErr := oltp.UpdateParentHasChildren(*playlist.ParentID); dbErr != nil {
+			// Логируем предупреждение, но не возвращаем ошибку
+			// т.к. плейлист уже удален
+		}
+	}
+
 	return nil
 }
 
@@ -169,12 +179,21 @@ func GetPlaylistMedia(oltp repo.OltpRepo, playlistID string, filter dto.SearchMe
 // AddMediaToPlaylist добавляет медиа в плейлист
 func AddMediaToPlaylist(oltp repo.OltpRepo, playlistID string, data dto.AddMediaToPlaylistDTO) *UCError {
 	// Проверяем существование плейлиста
-	_, dbErr := oltp.RetrievePlaylist(playlistID)
+	playlist, dbErr := oltp.RetrievePlaylist(playlistID)
 	if dbErr != nil {
 		return &UCError{
 			Code:     212,
 			HttpCode: http.StatusNotFound,
 			Message:  "Playlist not found",
+		}
+	}
+
+	// Проверяем что плейлист не имеет дочерних плейлистов
+	if playlist.HasChildren {
+		return &UCError{
+			Code:     267,
+			HttpCode: http.StatusBadRequest,
+			Message:  "Cannot add media to playlist with children",
 		}
 	}
 
@@ -305,12 +324,21 @@ func UpdateMediaOrder(oltp repo.OltpRepo, playlistID string, mediaID string, ord
 // BatchAddMediaToPlaylist добавляет несколько медиа в плейлист за один запрос
 func BatchAddMediaToPlaylist(oltp repo.OltpRepo, playlistID string, data dto.BatchAddMediaToPlaylistDTO) *UCError {
 	// Проверяем существование плейлиста
-	_, dbErr := oltp.RetrievePlaylist(playlistID)
+	playlist, dbErr := oltp.RetrievePlaylist(playlistID)
 	if dbErr != nil {
 		return &UCError{
 			Code:     212,
 			HttpCode: http.StatusNotFound,
 			Message:  "Playlist not found",
+		}
+	}
+
+	// Проверяем что плейлист не имеет дочерних плейлистов
+	if playlist.HasChildren {
+		return &UCError{
+			Code:     267,
+			HttpCode: http.StatusBadRequest,
+			Message:  "Cannot add media to playlist with children",
 		}
 	}
 
@@ -451,4 +479,33 @@ func BatchUpdateMediaOrder(oltp repo.OltpRepo, playlistID string, data dto.Batch
 	}
 
 	return nil
+}
+
+// SearchPlaylistsAutocomplete возвращает список плейлистов для автокомплита
+func SearchPlaylistsAutocomplete(oltp repo.OltpRepo, filter dto.PlaylistSearchDTO) ([]dto.PlaylistSearchResultDTO, *UCError) {
+	searchFilter := dto.SearchPlaylistsDTO{
+		BaseSearchRequestDTO: dto.BaseSearchRequestDTO{
+			Limit: utils.Ptr(uint(50)),
+		},
+		Name:                filter.Name,
+		IncludeAllHierarchy: utils.Ptr(true),
+	}
+
+	playlists, _, dbErr := oltp.SearchPlaylists(searchFilter)
+	if dbErr != nil {
+		return nil, &UCError{
+			Code:     216,
+			HttpCode: http.StatusInternalServerError,
+		}
+	}
+
+	results := make([]dto.PlaylistSearchResultDTO, len(playlists))
+	for i, playlist := range playlists {
+		results[i] = dto.PlaylistSearchResultDTO{
+			ID:   playlist.ID,
+			Name: playlist.Name,
+		}
+	}
+
+	return results, nil
 }

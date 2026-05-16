@@ -53,6 +53,18 @@ func RetrieveClient(oltp repo.OltpRepo, id string) (*models.Client, *UCError) {
 }
 
 func UpdateClient(oltp repo.OltpRepo, id string, data dto.UpdateClientDTO) (*models.Client, *UCError) {
+	// hash password if provided
+	if data.Password != nil {
+		pwdHash, err := utils.GeneratePasswordHash(*data.Password)
+		if err != nil {
+			return nil, &UCError{
+				Code:     157,
+				HttpCode: http.StatusInternalServerError,
+			}
+		}
+		data.Password = &pwdHash
+	}
+
 	// update DB record
 	updatedClient, dbErr := oltp.UpdateClient(id, data)
 	if dbErr != nil {

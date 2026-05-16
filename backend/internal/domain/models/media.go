@@ -14,7 +14,9 @@ type Media struct {
 
 type Playlist struct {
 	BaseModel
-	Name   string  `db:"name" json:"name"`
-	Type   string  `db:"type" json:"type"`
-	Poster *string `db:"poster" json:"poster"`
+	Name        string  `db:"name" json:"name"`
+	Type        string  `db:"type" json:"type"`
+	Poster      *string `db:"poster" json:"poster"`
+	ParentID    *string `db:"parent_id" json:"parent_id"`
+	HasChildren bool    `db:"has_children" json:"has_children"`
 }

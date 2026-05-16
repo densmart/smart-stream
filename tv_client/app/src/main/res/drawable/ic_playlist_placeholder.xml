@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="200dp"
+    android:height="280dp"
+    android:viewportWidth="200"
+    android:viewportHeight="280">
+
+    <!-- Background -->
+    <path
+        android:fillColor="@color/tv_card_background"
+        android:pathData="M0,0 L200,0 L200,280 L0,280 Z" />
+
+    <!-- Playlist icon (stacked rectangles) -->
+    <path
+        android:fillColor="@color/text_secondary"
+        android:pathData="M60,80 L140,80 L140,110 L60,110 Z" />
+    <path
+        android:fillColor="@color/text_secondary"
+        android:pathData="M60,125 L140,125 L140,155 L60,155 Z" />
+    <path
+        android:fillColor="@color/text_secondary"
+        android:pathData="M60,170 L140,170 L140,200 L60,200 Z" />
+</vector>
