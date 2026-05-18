@@ -60,6 +60,8 @@
 
     <!-- Details -->
     <string name="media_items">items</string>
+    <string name="episodes_count">Кол-во эпизодов: %d</string>
+    <string name="continue_watching">Продолжить просмотр (%s)</string>
 
     <!-- Server Settings -->
     <string name="settings_title">Server Configuration</string>

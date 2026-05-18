@@ -1,144 +1,102 @@
 package com.smartstream.tvclient.ui.details
 
 import android.content.Intent
-import android.graphics.Bitmap
-import android.graphics.drawable.Drawable
 import android.os.Bundle
+import android.view.LayoutInflater
+import android.view.View
+import android.view.ViewGroup
+import android.widget.ImageView
+import android.widget.TextView
 import android.widget.Toast
-import androidx.core.content.ContextCompat
-import androidx.leanback.app.DetailsSupportFragment
-import androidx.leanback.app.DetailsSupportFragmentBackgroundController
-import androidx.leanback.widget.ArrayObjectAdapter
-import androidx.leanback.widget.ClassPresenterSelector
-import androidx.leanback.widget.DetailsOverviewRow
-import androidx.leanback.widget.FullWidthDetailsOverviewRowPresenter
-import androidx.leanback.widget.FullWidthDetailsOverviewSharedElementHelper
-import androidx.leanback.widget.HeaderItem
-import androidx.leanback.widget.ListRow
-import androidx.leanback.widget.ListRowPresenter
-import androidx.leanback.widget.OnItemViewClickedListener
+import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
+import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
-import com.bumptech.glide.request.target.CustomTarget
-import com.bumptech.glide.request.transition.Transition
 import com.smartstream.tvclient.R
 import com.smartstream.tvclient.data.model.Media
-import com.smartstream.tvclient.data.model.Playlist
 import com.smartstream.tvclient.data.repository.MediaRepository
-import com.smartstream.tvclient.data.repository.PlaylistRepository
-import com.smartstream.tvclient.ui.main.CardPresenter
 import com.smartstream.tvclient.ui.player.PlayerActivity
 import com.smartstream.tvclient.utils.SharedPrefsManager
 import kotlinx.coroutines.launch
 
 /**
- * Fragment displaying playlist details and its media items.
- * Uses Leanback DetailsSupportFragment.
+ * Fragment displaying playlist details with vertical list of media items
  */
-class PlaylistDetailsFragment : DetailsSupportFragment() {
-
-    private lateinit var backgroundController: DetailsSupportFragmentBackgroundController
-    private lateinit var rowsAdapter: ArrayObjectAdapter
-    private lateinit var presenterSelector: ClassPresenterSelector
+class PlaylistDetailsFragment : Fragment() {
 
     private val mediaRepository = MediaRepository()
-    private val playlistRepository = PlaylistRepository()
+
+    private lateinit var backgroundPoster: ImageView
+    private lateinit var playlistPoster: ImageView
+    private lateinit var playlistName: TextView
+    private lateinit var episodesCount: TextView
+    private lateinit var mediaList: RecyclerView
+    private lateinit var adapter: MediaListAdapter
 
     private var playlistId: String? = null
-    private var playlistName: String? = null
-    private var playlistPoster: String? = null
-    private var playlistHasChildren: Boolean = false
-    private var posterBitmap: Bitmap? = null
+    private var playlistNameText: String? = null
+    private var playlistPosterPath: String? = null
 
-    override fun onCreate(savedInstanceState: Bundle?) {
-        android.util.Log.d(TAG, "onCreate: =============== PlaylistDetailsFragment created ===============")
-        super.onCreate(savedInstanceState)
+    override fun onCreateView(
+        inflater: LayoutInflater,
+        container: ViewGroup?,
+        savedInstanceState: Bundle?
+    ): View? {
+        return inflater.inflate(R.layout.fragment_playlist_details_media, container, false)
+    }
+
+    override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
+        super.onViewCreated(view, savedInstanceState)
 
         // Get extras from activity
         activity?.intent?.let { intent ->
             playlistId = intent.getStringExtra(PlaylistDetailsActivity.EXTRA_PLAYLIST_ID)
-            playlistName = intent.getStringExtra(PlaylistDetailsActivity.EXTRA_PLAYLIST_NAME)
-            playlistPoster = intent.getStringExtra(PlaylistDetailsActivity.EXTRA_PLAYLIST_POSTER)
-            playlistHasChildren = intent.getBooleanExtra(PlaylistDetailsActivity.EXTRA_PLAYLIST_HAS_CHILDREN, false)
+            playlistNameText = intent.getStringExtra(PlaylistDetailsActivity.EXTRA_PLAYLIST_NAME)
+            playlistPosterPath = intent.getStringExtra(PlaylistDetailsActivity.EXTRA_PLAYLIST_POSTER)
         }
 
-        android.util.Log.d(TAG, "onCreate: playlistId=$playlistId")
-        android.util.Log.d(TAG, "onCreate: playlistName=$playlistName")
-        android.util.Log.d(TAG, "onCreate: playlistPoster=$playlistPoster")
-        android.util.Log.d(TAG, "onCreate: playlistHasChildren=$playlistHasChildren")
-
-        backgroundController = DetailsSupportFragmentBackgroundController(this)
-        backgroundController.enableParallax()
+        initViews(view)
+        setupRecyclerView()
+        loadPoster()
+        loadMedia()
     }
 
-    override fun onActivityCreated(savedInstanceState: Bundle?) {
-        super.onActivityCreated(savedInstanceState)
-        android.util.Log.d(TAG, "onActivityCreated: Started")
+    private fun initViews(view: View) {
+        backgroundPoster = view.findViewById(R.id.background_poster)
+        playlistPoster = view.findViewById(R.id.playlist_poster)
+        playlistName = view.findViewById(R.id.playlist_name)
+        episodesCount = view.findViewById(R.id.episodes_count)
+        mediaList = view.findViewById(R.id.media_list)
 
-        android.util.Log.d(TAG, "onActivityCreated: Setting up adapter")
-        setupAdapter()
-
-        android.util.Log.d(TAG, "onActivityCreated: Setting up details overview row")
-        setupDetailsOverviewRow()
-
-        android.util.Log.d(TAG, "onActivityCreated: Loading poster image")
-        loadPosterImage()
-
-        android.util.Log.d(TAG, "onActivityCreated: Loading playlist content (hasChildren=$playlistHasChildren)")
-        loadPlaylistContent()
+        // Set playlist name
+        playlistName.text = playlistNameText ?: getString(R.string.playlists_loading)
     }
 
-    companion object {
-        private const val TAG = "PlaylistDetailsFrag"
-    }
-
-    private fun setupAdapter() {
-        // Setup presenter selector
-        val detailsPresenter = FullWidthDetailsOverviewRowPresenter(
-            MediaDetailsDescriptionPresenter()
-        ).apply {
-            backgroundColor = ContextCompat.getColor(requireContext(), R.color.tv_card_background)
-            initialState = FullWidthDetailsOverviewRowPresenter.STATE_HALF
-
-            val helper = FullWidthDetailsOverviewSharedElementHelper()
-            helper.setSharedElementEnterTransition(activity, "playlist_details")
-            setListener(helper)
+    private fun setupRecyclerView() {
+        adapter = MediaListAdapter(playlistId) { media ->
+            openMediaPlayer(media)
         }
 
-        presenterSelector = ClassPresenterSelector().apply {
-            addClassPresenter(DetailsOverviewRow::class.java, detailsPresenter)
-            addClassPresenter(ListRow::class.java, ListRowPresenter())
-        }
+        mediaList.adapter = adapter
+        mediaList.layoutManager = LinearLayoutManager(requireContext())
 
-        rowsAdapter = ArrayObjectAdapter(presenterSelector)
-        adapter = rowsAdapter
-
-        // Setup item click listener
-        setOnItemViewClickedListener(OnItemViewClickedListener { _, item, _, _ ->
-            when (item) {
-                is Media -> openMediaPlayer(item)
-                is Playlist -> openPlaylistDetails(item)
+        // Request focus on first item after layout
+        mediaList.postDelayed({
+            if (adapter.itemCount > 0) {
+                mediaList.getChildAt(0)?.requestFocus()
             }
-        })
+        }, 100)
     }
 
-    private fun setupDetailsOverviewRow() {
-        val row = DetailsOverviewRow(getString(R.string.playlists_loading))
-
-        row.setImageDrawable(
-            ContextCompat.getDrawable(
-                requireContext(),
-                R.drawable.ic_playlist_placeholder
-            )
-        )
-
-        rowsAdapter.add(row)
+    override fun onResume() {
+        super.onResume()
+        // Refresh adapter to update "continue watching" display
+        adapter.refreshList()
     }
 
-    private fun loadPosterImage() {
-        val row = rowsAdapter.get(0) as DetailsOverviewRow
-
-        val posterUrl = playlistPoster?.let {
+    private fun loadPoster() {
+        val posterUrl = playlistPosterPath?.let {
             when {
                 it.startsWith("http") -> it
                 it.startsWith("/static/posters/") -> "${SharedPrefsManager.getBaseUrl()}${it.removePrefix("/")}"
@@ -147,215 +105,94 @@ class PlaylistDetailsFragment : DetailsSupportFragment() {
             }
         }
 
-        android.util.Log.d(TAG, "loadPosterImage: playlistPoster=$playlistPoster")
-        android.util.Log.d(TAG, "loadPosterImage: posterUrl=$posterUrl")
+        android.util.Log.d(TAG, "loadPoster: posterUrl=$posterUrl")
 
         if (posterUrl != null) {
+            // Load small poster
             Glide.with(requireContext())
-                .asBitmap()
                 .load(posterUrl)
+                .centerCrop()
                 .error(R.drawable.ic_playlist_placeholder)
-                .into(object : CustomTarget<Bitmap>() {
-                    override fun onResourceReady(
-                        resource: Bitmap,
-                        transition: Transition<in Bitmap>?
-                    ) {
-                        android.util.Log.d(TAG, "loadPosterImage: Poster loaded successfully")
-                        posterBitmap = resource
-                        row.setImageBitmap(requireContext(), resource)
-                        rowsAdapter.notifyArrayItemRangeChanged(0, 1)
-                        backgroundController.coverBitmap = resource
-                    }
+                .placeholder(R.drawable.ic_playlist_placeholder)
+                .into(playlistPoster)
 
-                    override fun onLoadCleared(placeholder: Drawable?) {
-                        // No-op
-                    }
-                })
+            // Load background poster
+            Glide.with(requireContext())
+                .load(posterUrl)
+                .centerCrop()
+                .error(R.drawable.ic_playlist_placeholder)
+                .placeholder(R.drawable.ic_playlist_placeholder)
+                .into(backgroundPoster)
         } else {
-            android.util.Log.d(TAG, "loadPosterImage: No poster URL available")
+            android.util.Log.d(TAG, "loadPoster: No poster URL available")
+            playlistPoster.setImageResource(R.drawable.ic_playlist_placeholder)
+            backgroundPoster.setImageResource(R.drawable.ic_playlist_placeholder)
         }
     }
 
-    /**
-     * Load playlist content based on hasChildren flag
-     * If hasChildren == true: load child playlists
-     * If hasChildren == false: load media items
-     */
-    private fun loadPlaylistContent() {
-        android.util.Log.d(TAG, "loadPlaylistContent: called")
+    private fun loadMedia() {
         lifecycleScope.launch {
             try {
                 playlistId?.let { id ->
-                    if (playlistHasChildren) {
-                        android.util.Log.d(TAG, "loadPlaylistContent: Loading child playlists for $id")
-                        loadPlaylistChildren(id)
-                    } else {
-                        android.util.Log.d(TAG, "loadPlaylistContent: Loading media for $id")
-                        loadPlaylistMedia(id)
+                    android.util.Log.d(TAG, "loadMedia: Loading media for playlist $id")
+                    val result = mediaRepository.getPlaylistMedia(id, limit = 100, offset = 0)
+                    result.onSuccess { apiResponse ->
+                        if (apiResponse.isSuccess() && apiResponse.result != null) {
+                            val media = apiResponse.result
+                            android.util.Log.d(TAG, "loadMedia: Got ${media.size} media items")
+
+                            // Update episodes count
+                            episodesCount.text = getString(R.string.episodes_count, media.size)
+
+                            // Submit sorted list to adapter
+                            adapter.submitList(media)
+
+                            // Request focus on first item
+                            mediaList.postDelayed({
+                                if (adapter.itemCount > 0) {
+                                    mediaList.getChildAt(0)?.requestFocus()
+                                }
+                            }, 200)
+                        } else {
+                            android.util.Log.e(TAG, "loadMedia: API error: ${apiResponse.error}")
+                            showError(apiResponse.error ?: getString(R.string.media_error))
+                        }
+                    }.onFailure { error ->
+                        android.util.Log.e(TAG, "loadMedia: Failed", error)
+                        showError(error.message ?: getString(R.string.media_error))
                     }
                 }
             } catch (e: Exception) {
-                android.util.Log.e(TAG, "loadPlaylistContent: Exception", e)
+                android.util.Log.e(TAG, "loadMedia: Exception", e)
                 showError(e.message ?: getString(R.string.error))
             }
         }
     }
 
-    /**
-     * Load child playlists
-     */
-    private suspend fun loadPlaylistChildren(playlistId: String) {
-        android.util.Log.d(TAG, "loadPlaylistChildren: Starting request for $playlistId")
-        val result = playlistRepository.getPlaylistChildren(playlistId, limit = 100, offset = 0)
-        result.onSuccess { playlists ->
-            android.util.Log.d(TAG, "loadPlaylistChildren: Success! Got ${playlists.size} playlists")
-            displayChildPlaylists(playlists)
-        }.onFailure { error ->
-            android.util.Log.e(TAG, "loadPlaylistChildren: Failed", error)
-            showError(error.message ?: getString(R.string.playlists_error))
-        }
-    }
-
-    /**
-     * Load media items
-     */
-    private suspend fun loadPlaylistMedia(playlistId: String) {
-        val result = mediaRepository.getPlaylistMedia(playlistId, limit = 100, offset = 0)
-        result.onSuccess { apiResponse ->
-            if (apiResponse.isSuccess() && apiResponse.result != null) {
-                val mediaList = apiResponse.result
-                displayMediaList(mediaList)
-            } else {
-                showError(apiResponse.error ?: getString(R.string.media_error))
-            }
-        }.onFailure { error ->
-            showError(error.message ?: getString(R.string.media_error))
-        }
-    }
-
-    /**
-     * Display child playlists
-     */
-    private fun displayChildPlaylists(playlists: List<Playlist>) {
-        android.util.Log.d(TAG, "displayChildPlaylists: Displaying ${playlists.size} playlists")
-
-        if (playlists.isEmpty()) {
-            android.util.Log.d(TAG, "displayChildPlaylists: Empty playlists, showing empty message")
-            // Create new row with empty message
-            val emptyRow = DetailsOverviewRow(getString(R.string.playlists_empty))
-            if (posterBitmap != null) {
-                emptyRow.setImageBitmap(requireContext(), posterBitmap)
-            } else {
-                emptyRow.setImageDrawable(
-                    ContextCompat.getDrawable(
-                        requireContext(),
-                        R.drawable.ic_playlist_placeholder
-                    )
-                )
-            }
-            rowsAdapter.replace(0, emptyRow)
-            return
-        }
-
-        android.util.Log.d(TAG, "displayChildPlaylists: Updating details row with count")
-        // Create new row with playlists count
-        val updatedRow = DetailsOverviewRow("${playlists.size} ${getString(R.string.playlists_items)}")
-        // Set poster image if available
-        if (posterBitmap != null) {
-            updatedRow.setImageBitmap(requireContext(), posterBitmap)
-        } else {
-            updatedRow.setImageDrawable(
-                ContextCompat.getDrawable(
-                    requireContext(),
-                    R.drawable.ic_playlist_placeholder
-                )
-            )
-        }
-        rowsAdapter.replace(0, updatedRow)
-
-        android.util.Log.d(TAG, "displayChildPlaylists: Creating list row with playlists")
-        // Add playlists list
-        val cardPresenter = CardPresenter()
-        val listRowAdapter = ArrayObjectAdapter(cardPresenter)
-        playlists.forEach { playlist ->
-            android.util.Log.d(TAG, "displayChildPlaylists: Adding playlist: ${playlist.name}")
-            listRowAdapter.add(playlist)
-        }
-
-        val header = HeaderItem(0, getString(R.string.main_playlists))
-        rowsAdapter.add(ListRow(header, listRowAdapter))
-
-        android.util.Log.d(TAG, "displayChildPlaylists: Adapter now has ${rowsAdapter.size()} rows")
-        android.util.Log.d(TAG, "displayChildPlaylists: Done!")
-    }
-
-    private fun displayMediaList(mediaList: List<Media>) {
-        android.util.Log.d(TAG, "displayMediaList: Displaying ${mediaList.size} media items")
-
-        if (mediaList.isEmpty()) {
-            android.util.Log.d(TAG, "displayMediaList: Empty media list, showing empty message")
-            // Create new row with empty message
-            val emptyRow = DetailsOverviewRow(getString(R.string.media_empty))
-            if (posterBitmap != null) {
-                emptyRow.setImageBitmap(requireContext(), posterBitmap)
-            } else {
-                emptyRow.setImageDrawable(
-                    ContextCompat.getDrawable(
-                        requireContext(),
-                        R.drawable.ic_playlist_placeholder
-                    )
-                )
-            }
-            rowsAdapter.replace(0, emptyRow)
-            return
-        }
-
-        android.util.Log.d(TAG, "displayMediaList: Updating details row with count")
-        // Create new row with media count
-        val updatedRow = DetailsOverviewRow("${mediaList.size} ${getString(R.string.media_items)}")
-        // Set poster image if available
-        if (posterBitmap != null) {
-            updatedRow.setImageBitmap(requireContext(), posterBitmap)
-        } else {
-            updatedRow.setImageDrawable(
-                ContextCompat.getDrawable(
-                    requireContext(),
-                    R.drawable.ic_playlist_placeholder
-                )
-            )
-        }
-        rowsAdapter.replace(0, updatedRow)
-
-        android.util.Log.d(TAG, "displayMediaList: Creating list row with media")
-        // Add media list
-        val cardPresenter = CardPresenter()
-        val listRowAdapter = ArrayObjectAdapter(cardPresenter)
-        mediaList.forEach { media ->
-            android.util.Log.d(TAG, "displayMediaList: Adding media: ${media.name}")
-            listRowAdapter.add(media)
-        }
-
-        val header = HeaderItem(0, getString(R.string.main_media))
-        rowsAdapter.add(ListRow(header, listRowAdapter))
-
-        android.util.Log.d(TAG, "displayMediaList: Adapter now has ${rowsAdapter.size()} rows")
-        android.util.Log.d(TAG, "displayMediaList: Done!")
-    }
-
     private fun openMediaPlayer(media: Media) {
+        // Get saved position - check if this is the current episode in playlist
+        val pId = playlistId
+        val savedPosition = if (pId != null) {
+            val currentMediaId = SharedPrefsManager.getPlaylistCurrentMedia(pId)
+            if (currentMediaId == media.id) {
+                // This is the current episode, get its position
+                SharedPrefsManager.getPlaylistPosition(pId)
+            } else {
+                // Different episode, start from beginning
+                0L
+            }
+        } else {
+            // Single media, get its saved position
+            SharedPrefsManager.getMediaPosition(media.id)
+        }
+
         val intent = Intent(requireContext(), PlayerActivity::class.java).apply {
             putExtra(PlayerActivity.EXTRA_MEDIA_ID, media.id)
             putExtra(PlayerActivity.EXTRA_MEDIA_NAME, media.name)
-        }
-        startActivity(intent)
-    }
-
-    private fun openPlaylistDetails(playlist: Playlist) {
-        val intent = Intent(requireContext(), PlaylistDetailsActivity::class.java).apply {
-            putExtra(PlaylistDetailsActivity.EXTRA_PLAYLIST_ID, playlist.id)
-            putExtra(PlaylistDetailsActivity.EXTRA_PLAYLIST_NAME, playlist.name)
-            putExtra(PlaylistDetailsActivity.EXTRA_PLAYLIST_POSTER, playlist.poster)
-            putExtra(PlaylistDetailsActivity.EXTRA_PLAYLIST_HAS_CHILDREN, playlist.hasChildren)
+            // Pass playlist ID for autoplay
+            putExtra(PlayerActivity.EXTRA_PLAYLIST_ID, pId)
+            // Pass saved position for continue watching
+            putExtra(PlayerActivity.EXTRA_START_POSITION, savedPosition)
         }
         startActivity(intent)
     }
@@ -364,5 +201,9 @@ class PlaylistDetailsFragment : DetailsSupportFragment() {
         activity?.runOnUiThread {
             Toast.makeText(requireContext(), message, Toast.LENGTH_LONG).show()
         }
+    }
+
+    companion object {
+        private const val TAG = "PlaylistDetailsFrag"
     }
 }

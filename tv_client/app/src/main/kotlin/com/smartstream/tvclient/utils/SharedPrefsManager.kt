@@ -146,4 +146,50 @@ object SharedPrefsManager {
     fun clearMediaPosition(mediaId: String) {
         prefs.edit().remove("${Constants.KEY_MEDIA_POSITION_PREFIX}$mediaId").apply()
     }
+
+    // ==================== Playlist Progress ====================
+
+    /**
+     * Save playlist progress (current episode and position)
+     * @param playlistId Playlist ID
+     * @param mediaId Current media ID in playlist
+     * @param positionMs Position in milliseconds
+     */
+    fun savePlaylistProgress(playlistId: String, mediaId: String, positionMs: Long) {
+        prefs.edit().apply {
+            putString("playlist_${playlistId}_current_media", mediaId)
+            putLong("playlist_${playlistId}_position", positionMs)
+            apply()
+        }
+    }
+
+    /**
+     * Get current media ID for a playlist
+     * @param playlistId Playlist ID
+     * @return Current media ID or null
+     */
+    fun getPlaylistCurrentMedia(playlistId: String): String? {
+        return prefs.getString("playlist_${playlistId}_current_media", null)
+    }
+
+    /**
+     * Get saved position for current episode in playlist
+     * @param playlistId Playlist ID
+     * @return Position in milliseconds, or 0 if not found
+     */
+    fun getPlaylistPosition(playlistId: String): Long {
+        return prefs.getLong("playlist_${playlistId}_position", 0L)
+    }
+
+    /**
+     * Clear playlist progress
+     * @param playlistId Playlist ID
+     */
+    fun clearPlaylistProgress(playlistId: String) {
+        prefs.edit().apply {
+            remove("playlist_${playlistId}_current_media")
+            remove("playlist_${playlistId}_position")
+            apply()
+        }
+    }
 }

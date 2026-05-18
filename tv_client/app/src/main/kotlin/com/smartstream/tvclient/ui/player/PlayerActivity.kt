@@ -14,7 +14,12 @@ import com.google.android.exoplayer2.upstream.DataSource
 import com.google.android.exoplayer2.upstream.DefaultDataSource
 import com.google.android.exoplayer2.upstream.DefaultHttpDataSource
 import com.smartstream.tvclient.R
+import com.smartstream.tvclient.data.repository.MediaRepository
 import com.smartstream.tvclient.utils.SharedPrefsManager
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /**
  * Video player activity for TV.
@@ -28,12 +33,16 @@ class PlayerActivity : FragmentActivity() {
     private var mediaId: String? = null
     private var mediaName: String? = null
     private var startPosition: Long = 0L
+    private var playlistId: String? = null
+    private var playlistMedia: List<com.smartstream.tvclient.data.model.Media> = emptyList()
+    private val mediaRepository = MediaRepository()
 
     companion object {
         private const val TAG = "PlayerActivity"
         const val EXTRA_MEDIA_ID = "media_id"
         const val EXTRA_MEDIA_NAME = "media_name"
         const val EXTRA_START_POSITION = "start_position"
+        const val EXTRA_PLAYLIST_ID = "playlist_id"
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -48,8 +57,9 @@ class PlayerActivity : FragmentActivity() {
             mediaId = intent.getStringExtra(EXTRA_MEDIA_ID)
             mediaName = intent.getStringExtra(EXTRA_MEDIA_NAME)
             startPosition = intent.getLongExtra(EXTRA_START_POSITION, 0L)
+            playlistId = intent.getStringExtra(EXTRA_PLAYLIST_ID)
 
-            Log.d(TAG, "onCreate: mediaId=$mediaId, mediaName=$mediaName, startPosition=$startPosition")
+            Log.d(TAG, "onCreate: mediaId=$mediaId, mediaName=$mediaName, startPosition=$startPosition, playlistId=$playlistId")
 
             if (mediaId == null) {
                 Log.e(TAG, "onCreate: mediaId is null, finishing activity")
@@ -75,7 +85,12 @@ class PlayerActivity : FragmentActivity() {
             playerView = findViewById(R.id.player_view)
             Log.d(TAG, "onCreate: PlayerView found")
 
-            initializePlayer()
+            // Load playlist media if playlist ID is provided
+            if (playlistId != null) {
+                loadPlaylistMedia()
+            } else {
+                initializePlayer()
+            }
         } catch (e: Exception) {
             Log.e(TAG, "onCreate: Exception occurred!", e)
             Toast.makeText(this, "Error: ${e.message}", Toast.LENGTH_LONG).show()
@@ -94,9 +109,6 @@ class PlayerActivity : FragmentActivity() {
             // Build streaming URL
             val streamUrl = buildStreamUrl(mediaId!!)
             Log.d(TAG, "initializePlayer: Stream URL = $streamUrl")
-
-            // Show URL to user for debugging
-            Toast.makeText(this, "Loading: $streamUrl", Toast.LENGTH_SHORT).show()
 
             // Create player
             Log.d(TAG, "initializePlayer: Creating ExoPlayer instance")
@@ -139,17 +151,31 @@ class PlayerActivity : FragmentActivity() {
                             }
                             Log.d(TAG, "onPlaybackStateChanged: $stateString")
 
-                            if (playbackState == Player.STATE_READY) {
-                                Toast.makeText(this@PlayerActivity, "Playback started", Toast.LENGTH_SHORT).show()
-                            } else if (playbackState == Player.STATE_ENDED) {
-                                // Video finished, clear saved position and close player
-                                mediaId?.let { SharedPrefsManager.clearMediaPosition(it) }
-                                Log.d(TAG, "onPlaybackStateChanged: Video ended, cleared saved position")
-
-                                // Close player after a short delay
-                                playerView.postDelayed({
-                                    finish()
-                                }, 1000)
+                            if (playbackState == Player.STATE_ENDED) {
+                                // Video finished, clear saved position
+                                if (playlistId != null) {
+                                    // For playlist, check if there's a next video
+                                    val currentIndex = playlistMedia.indexOfFirst { it.id == mediaId }
+                                    if (currentIndex >= 0 && currentIndex < playlistMedia.size - 1) {
+                                        // There's a next video, save progress for it with position 0
+                                        val nextMedia = playlistMedia[currentIndex + 1]
+                                        SharedPrefsManager.savePlaylistProgress(playlistId!!, nextMedia.id, 0L)
+                                        Log.d(TAG, "onPlaybackStateChanged: Moving to next episode ${nextMedia.id}")
+                                    } else {
+                                        // Last video, clear playlist progress
+                                        SharedPrefsManager.clearPlaylistProgress(playlistId!!)
+                                        Log.d(TAG, "onPlaybackStateChanged: Last video, cleared playlist progress")
+                                    }
+                                    handleVideoEnded()
+                                } else {
+                                    // Single media, clear its position
+                                    mediaId?.let { SharedPrefsManager.clearMediaPosition(it) }
+                                    Log.d(TAG, "onPlaybackStateChanged: Video ended, cleared saved position")
+                                    // Close player after a short delay
+                                    playerView.postDelayed({
+                                        finish()
+                                    }, 1000)
+                                }
                             }
                         }
 
@@ -218,6 +244,73 @@ class PlayerActivity : FragmentActivity() {
         return "${baseUrl}media/$mediaId/stream/"
     }
 
+    private fun loadPlaylistMedia() {
+        Log.d(TAG, "loadPlaylistMedia: Loading media for playlist $playlistId")
+        CoroutineScope(Dispatchers.Main).launch {
+            try {
+                val result = withContext(Dispatchers.IO) {
+                    mediaRepository.getPlaylistMedia(playlistId!!, limit = 100, offset = 0)
+                }
+
+                result.onSuccess { apiResponse ->
+                    if (apiResponse.isSuccess() && apiResponse.result != null) {
+                        playlistMedia = apiResponse.result.sortedBy { it.order }
+                        Log.d(TAG, "loadPlaylistMedia: Loaded ${playlistMedia.size} media items")
+                        initializePlayer()
+                    } else {
+                        Log.e(TAG, "loadPlaylistMedia: API error: ${apiResponse.error}")
+                        Toast.makeText(this@PlayerActivity, "Failed to load playlist", Toast.LENGTH_SHORT).show()
+                        initializePlayer()
+                    }
+                }.onFailure { error ->
+                    Log.e(TAG, "loadPlaylistMedia: Failed", error)
+                    Toast.makeText(this@PlayerActivity, "Failed to load playlist", Toast.LENGTH_SHORT).show()
+                    initializePlayer()
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "loadPlaylistMedia: Exception", e)
+                Toast.makeText(this@PlayerActivity, "Failed to load playlist", Toast.LENGTH_SHORT).show()
+                initializePlayer()
+            }
+        }
+    }
+
+    private fun handleVideoEnded() {
+        Log.d(TAG, "handleVideoEnded: Checking for next video in playlist")
+
+        // Find current media index
+        val currentIndex = playlistMedia.indexOfFirst { it.id == mediaId }
+        Log.d(TAG, "handleVideoEnded: Current index = $currentIndex, total = ${playlistMedia.size}")
+
+        if (currentIndex >= 0 && currentIndex < playlistMedia.size - 1) {
+            // There is a next video
+            val nextMedia = playlistMedia[currentIndex + 1]
+            Log.d(TAG, "handleVideoEnded: Playing next video: ${nextMedia.name}")
+
+            Toast.makeText(this@PlayerActivity, "Playing next: ${nextMedia.name}", Toast.LENGTH_SHORT).show()
+
+            // Update current media info
+            mediaId = nextMedia.id
+            mediaName = nextMedia.name
+            startPosition = 0L
+
+            // Release current player
+            releasePlayer()
+
+            // Initialize player with next video
+            playerView.postDelayed({
+                initializePlayer()
+            }, 500)
+        } else {
+            // No more videos, close player
+            Log.d(TAG, "handleVideoEnded: Last video in playlist, closing player")
+            Toast.makeText(this@PlayerActivity, "Playlist finished", Toast.LENGTH_SHORT).show()
+            playerView.postDelayed({
+                finish()
+            }, 1000)
+        }
+    }
+
     private fun handlePlayerError(error: PlaybackException) {
         Log.e(TAG, "handlePlayerError: Processing error...")
         Log.e(TAG, "handlePlayerError: Error type = ${error.javaClass.simpleName}")
@@ -277,8 +370,15 @@ class PlayerActivity : FragmentActivity() {
             // Only save if position is valid and not at the very end (within 1 second)
             if (currentPosition > 1000 && (duration <= 0 || currentPosition < duration - 1000)) {
                 mediaId?.let { id ->
-                    SharedPrefsManager.saveMediaPosition(id, currentPosition)
-                    Log.d(TAG, "onPause: Saved position $currentPosition ms for media $id")
+                    if (playlistId != null) {
+                        // Save playlist progress (current episode + position)
+                        SharedPrefsManager.savePlaylistProgress(playlistId!!, id, currentPosition)
+                        Log.d(TAG, "onPause: Saved playlist progress - episode $id at $currentPosition ms")
+                    } else {
+                        // Save individual media position (for single media not in playlist)
+                        SharedPrefsManager.saveMediaPosition(id, currentPosition)
+                        Log.d(TAG, "onPause: Saved position $currentPosition ms for media $id")
+                    }
                 }
             } else {
                 Log.d(TAG, "onPause: Position NOT saved (currentPosition=$currentPosition, duration=$duration)")
