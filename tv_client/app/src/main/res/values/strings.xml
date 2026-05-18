@@ -40,6 +40,11 @@
     <string name="playlists_empty">No playlists available</string>
     <string name="playlists_items">playlists</string>
 
+    <!-- Playlist Types -->
+    <string name="playlist_type_series">Сериал</string>
+    <string name="playlist_type_franchise">Франшиза</string>
+    <string name="playlist_type_favourites">Избранное</string>
+
     <!-- Player -->
     <string name="player_loading">Loading video…</string>
     <string name="player_error">Playback error</string>

@@ -71,7 +71,7 @@ class CardPresenter : Presenter() {
 
     private fun bindPlaylist(cardView: ImageCardView, playlist: Playlist) {
         cardView.setTitleText(playlist.name)
-        cardView.setContentText(playlist.getTypeDisplayName())
+        cardView.setContentText(playlist.getTypeDisplayName(cardView.context))
 
         // Load poster image
         val posterUrl = playlist.getPosterUrl(SharedPrefsManager.getBaseUrl())

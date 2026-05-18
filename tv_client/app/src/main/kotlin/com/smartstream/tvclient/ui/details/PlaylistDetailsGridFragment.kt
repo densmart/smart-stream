@@ -1,7 +1,6 @@
-package com.smartstream.tvclient.ui.main
+package com.smartstream.tvclient.ui.details
 
 import android.content.Intent
-import android.graphics.Color
 import android.graphics.Rect
 import android.os.Bundle
 import android.util.Log
@@ -9,7 +8,6 @@ import android.view.KeyEvent
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import android.widget.ImageButton
 import android.widget.ImageView
 import android.widget.TextView
 import android.widget.Toast
@@ -23,88 +21,82 @@ import com.smartstream.tvclient.data.model.Media
 import com.smartstream.tvclient.data.model.Playlist
 import com.smartstream.tvclient.data.repository.MediaRepository
 import com.smartstream.tvclient.data.repository.PlaylistRepository
-import com.smartstream.tvclient.ui.details.MediaDetailsActivity
-import com.smartstream.tvclient.ui.details.PlaylistDetailsActivity
-import com.smartstream.tvclient.ui.settings.ServerSettingsDialogFragment
+import com.smartstream.tvclient.ui.main.MediaCardAdapter
+import com.smartstream.tvclient.ui.player.PlayerActivity
 import com.smartstream.tvclient.utils.SharedPrefsManager
 import kotlinx.coroutines.launch
 
 /**
- * Main browse fragment with custom design
- * Shows tabs for Media/Playlists with grid of cards and detail panel
+ * Fragment for displaying playlist children in a grid layout (like main screen)
+ * with breadcrumb navigation
  */
-class MainBrowseFragmentNew : Fragment() {
+class PlaylistDetailsGridFragment : Fragment() {
 
     private val playlistRepository = PlaylistRepository()
     private val mediaRepository = MediaRepository()
 
     private lateinit var recyclerView: RecyclerView
     private lateinit var adapter: MediaCardAdapter
-
-    private lateinit var tabMedia: TextView
-    private lateinit var tabPlaylists: TextView
-    private lateinit var btnSettings: ImageButton
-    private lateinit var btnSearch: ImageButton
+    private lateinit var breadcrumbText: TextView
+    private lateinit var btnSearch: View
 
     private lateinit var detailPoster: ImageView
     private lateinit var detailTitle: TextView
     private lateinit var detailInfo: TextView
     private lateinit var detailCardContainer: View
 
-    private var currentTab = Tab.MEDIA
-
-    enum class Tab {
-        MEDIA, PLAYLISTS
-    }
+    private var playlistId: String? = null
+    private var playlistName: String? = null
+    private var playlistPoster: String? = null
+    private var playlistHasChildren: Boolean = false
 
     override fun onCreateView(
         inflater: LayoutInflater,
         container: ViewGroup?,
         savedInstanceState: Bundle?
     ): View? {
-        return inflater.inflate(R.layout.fragment_main_browse_custom, container, false)
+        return inflater.inflate(R.layout.fragment_playlist_details_grid, container, false)
     }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
+        // Get extras from activity
+        activity?.intent?.let { intent ->
+            playlistId = intent.getStringExtra(PlaylistDetailsActivity.EXTRA_PLAYLIST_ID)
+            playlistName = intent.getStringExtra(PlaylistDetailsActivity.EXTRA_PLAYLIST_NAME)
+            playlistPoster = intent.getStringExtra(PlaylistDetailsActivity.EXTRA_PLAYLIST_POSTER)
+            playlistHasChildren = intent.getBooleanExtra(PlaylistDetailsActivity.EXTRA_PLAYLIST_HAS_CHILDREN, false)
+        }
+
         initViews(view)
         setupRecyclerView()
-        setupTabButtons()
-        setupSettingsButton()
+        setupBreadcrumb()
 
-        // Load initial content (Media by default)
-        loadMediaContent()
+        // Load playlist children
+        loadPlaylistChildren()
     }
 
     private fun initViews(view: View) {
         recyclerView = view.findViewById(R.id.cards_recycler_view)
-        tabMedia = view.findViewById(R.id.tab_media)
-        tabPlaylists = view.findViewById(R.id.tab_playlists)
-        btnSettings = view.findViewById(R.id.btn_settings)
+        breadcrumbText = view.findViewById(R.id.breadcrumb_text)
         btnSearch = view.findViewById(R.id.btn_search)
-
         detailCardContainer = view.findViewById(R.id.detail_card_container)
-
-        // Force visibility and text properties
-        tabMedia.visibility = View.VISIBLE
-        tabPlaylists.visibility = View.VISIBLE
-        tabMedia.alpha = 1f
-        tabPlaylists.alpha = 1f
-
-        // Set text programmatically to ensure it's there
-        tabMedia.text = "Media"
-        tabPlaylists.text = "Playlists"
         detailPoster = view.findViewById(R.id.detail_poster)
         detailTitle = view.findViewById(R.id.detail_title)
         detailInfo = view.findViewById(R.id.detail_info)
+
+        // Setup search button click
+        btnSearch.setOnClickListener {
+            Toast.makeText(requireContext(), "Search not implemented yet", Toast.LENGTH_SHORT).show()
+        }
     }
 
     private fun setupRecyclerView() {
         adapter = MediaCardAdapter(
             onItemClick = { item ->
                 when (item) {
-                    is Media -> openMediaDetails(item)
+                    is Media -> openMediaPlayer(item)
                     is Playlist -> openPlaylistDetails(item)
                 }
             },
@@ -137,21 +129,17 @@ class MainBrowseFragmentNew : Fragment() {
                         if (currentColumn == spanCount - 1) {
                             val nextRowFirstItem = (currentRow + 1) * spanCount
                             if (nextRowFirstItem < itemCount) {
-                                // Scroll to make sure the view is visible
                                 recyclerView.post {
                                     recyclerView.smoothScrollToPosition(nextRowFirstItem)
                                     recyclerView.postDelayed({
                                         findViewByPosition(nextRowFirstItem)?.requestFocus()
                                     }, 100)
                                 }
-                                // Return focused to prevent default behavior
                                 return focused
                             } else {
-                                // No next row, stay on current item
                                 return focused
                             }
                         } else if (position == itemCount - 1) {
-                            // Last item overall, prevent moving right
                             return focused
                         }
                     }
@@ -170,7 +158,6 @@ class MainBrowseFragmentNew : Fragment() {
                                     return focused
                                 }
                             } else {
-                                // First row, first column - prevent moving left
                                 return focused
                             }
                         }
@@ -185,7 +172,6 @@ class MainBrowseFragmentNew : Fragment() {
         // Add spacing between cards
         val spacing = resources.getDimensionPixelSize(R.dimen.card_margin)
         recyclerView.addItemDecoration(GridSpacingItemDecoration(6, spacing, true))
-
     }
 
     /**
@@ -224,6 +210,18 @@ class MainBrowseFragmentNew : Fragment() {
         }
     }
 
+    private fun setupBreadcrumb() {
+        // Build breadcrumb: "Playlists > Parent Name"
+        val breadcrumb = buildString {
+            append(getString(R.string.main_playlists))
+            if (playlistName != null) {
+                append(" > ")
+                append(playlistName)
+            }
+        }
+        breadcrumbText.text = breadcrumb
+    }
+
     private fun showDetailCard() {
         if (detailCardContainer.visibility == View.GONE) {
             detailCardContainer.visibility = View.VISIBLE
@@ -240,156 +238,30 @@ class MainBrowseFragmentNew : Fragment() {
         }
     }
 
-    private fun setupTabButtons() {
-        tabMedia.setOnClickListener {
-            switchTab(Tab.MEDIA)
-        }
-
-        tabPlaylists.setOnClickListener {
-            switchTab(Tab.PLAYLISTS)
-        }
-
-        // Intercept DOWN key to focus first card
-        val downKeyListener = View.OnKeyListener { _, keyCode, event ->
-            if (keyCode == KeyEvent.KEYCODE_DPAD_DOWN && event.action == KeyEvent.ACTION_DOWN) {
-                recyclerView.post {
-                    recyclerView.scrollToPosition(0)
-                    recyclerView.postDelayed({
-                        val firstViewHolder = recyclerView.findViewHolderForAdapterPosition(0)
-                        firstViewHolder?.itemView?.requestFocus()
-                    }, 50)
-                }
-                true
-            } else {
-                false
-            }
-        }
-
-        tabMedia.setOnKeyListener(downKeyListener)
-        tabPlaylists.setOnKeyListener(downKeyListener)
-        btnSettings.setOnKeyListener(downKeyListener)
-
-        // Hide preview when tabs receive focus and update text color
-        val grayColor = Color.parseColor("#999999")
-
-        tabMedia.setOnFocusChangeListener { _, hasFocus ->
-            if (hasFocus) {
-                hideDetailCard()
-                // Dark text on focused background (light gray)
-                tabMedia.setTextColor(Color.BLACK)
-            } else {
-                // Restore color based on selection: selected = black, not selected = gray
-                tabMedia.setTextColor(if (currentTab == Tab.MEDIA) Color.BLACK else grayColor)
-            }
-        }
-
-        tabPlaylists.setOnFocusChangeListener { _, hasFocus ->
-            if (hasFocus) {
-                hideDetailCard()
-                // Dark text on focused background (light gray)
-                tabPlaylists.setTextColor(Color.BLACK)
-            } else {
-                // Restore color based on selection: selected = black, not selected = gray
-                tabPlaylists.setTextColor(if (currentTab == Tab.PLAYLISTS) Color.BLACK else grayColor)
-            }
-        }
-
-        // Set initial selection
-        updateTabSelection()
-    }
-
-    private fun setupSettingsButton() {
-        btnSettings.setOnClickListener {
-            showSettingsDialog()
-        }
-
-        btnSearch.setOnClickListener {
-            // TODO: Implement search functionality
-            Toast.makeText(requireContext(), "Search not implemented yet", Toast.LENGTH_SHORT).show()
-        }
-
-        // Intercept DOWN key for search button to focus first card
-        btnSearch.setOnKeyListener { _, keyCode, event ->
-            if (keyCode == KeyEvent.KEYCODE_DPAD_DOWN && event.action == KeyEvent.ACTION_DOWN) {
-                recyclerView.post {
-                    recyclerView.scrollToPosition(0)
-                    recyclerView.postDelayed({
-                        val firstViewHolder = recyclerView.findViewHolderForAdapterPosition(0)
-                        firstViewHolder?.itemView?.requestFocus()
-                    }, 50)
-                }
-                true
-            } else {
-                false
-            }
-        }
-
-        // Hide preview when settings or search receive focus
-        btnSettings.setOnFocusChangeListener { _, hasFocus ->
-            if (hasFocus) {
-                hideDetailCard()
-            }
-        }
-
-        btnSearch.setOnFocusChangeListener { _, hasFocus ->
-            if (hasFocus) {
-                hideDetailCard()
-            }
-        }
-    }
-
-    private fun switchTab(tab: Tab) {
-        if (currentTab == tab) return
-
-        currentTab = tab
-        updateTabSelection()
-
-        when (tab) {
-            Tab.MEDIA -> loadMediaContent()
-            Tab.PLAYLISTS -> loadPlaylistsContent()
-        }
-    }
-
-    private fun updateTabSelection() {
-        tabMedia.isSelected = (currentTab == Tab.MEDIA)
-        tabPlaylists.isSelected = (currentTab == Tab.PLAYLISTS)
-
-        // Update text color: selected = black on white, not selected = gray on transparent
-        val grayColor = Color.parseColor("#999999")
-        tabMedia.setTextColor(if (currentTab == Tab.MEDIA) Color.BLACK else grayColor)
-        tabPlaylists.setTextColor(if (currentTab == Tab.PLAYLISTS) Color.BLACK else grayColor)
-
-        // Ensure alpha is set to fully opaque
-        tabMedia.alpha = 1f
-        tabPlaylists.alpha = 1f
-    }
-
-    private fun loadMediaContent() {
+    private fun loadPlaylistChildren() {
         lifecycleScope.launch {
             try {
-                val result = mediaRepository.getMediaList(onlyUnassigned = true)
-                result.onSuccess { mediaList ->
-                    adapter.submitList(mediaList)
-                }.onFailure { error ->
-                    showError("${getString(R.string.media_error)}: ${error.message}")
-                }
-            } catch (e: Exception) {
-                showError("${getString(R.string.error)}: ${e.message}")
-            }
-        }
-    }
+                playlistId?.let { id ->
+                    Log.d(TAG, "Loading children for playlist: $id")
+                    val result = playlistRepository.getPlaylistChildren(id, limit = 100, offset = 0)
+                    result.onSuccess { playlists ->
+                        Log.d(TAG, "Loaded ${playlists.size} child playlists")
+                        adapter.submitList(playlists)
 
-    private fun loadPlaylistsContent() {
-        lifecycleScope.launch {
-            try {
-                val result = playlistRepository.getPlaylists()
-                result.onSuccess { playlists ->
-                    adapter.submitList(playlists)
-                }.onFailure { error ->
-                    showError("${getString(R.string.playlists_error)}: ${error.message}")
+                        // Request focus on first item after data is loaded
+                        recyclerView.postDelayed({
+                            if (adapter.itemCount > 0 && recyclerView.childCount > 0) {
+                                recyclerView.getChildAt(0)?.requestFocus()
+                            }
+                        }, 100)
+                    }.onFailure { error ->
+                        Log.e(TAG, "Failed to load children", error)
+                        showError(error.message ?: getString(R.string.playlists_error))
+                    }
                 }
             } catch (e: Exception) {
-                showError("${getString(R.string.error)}: ${e.message}")
+                Log.e(TAG, "Exception loading children", e)
+                showError(e.message ?: getString(R.string.error))
             }
         }
     }
@@ -404,8 +276,6 @@ class MainBrowseFragmentNew : Fragment() {
                 detailTitle.visibility = View.VISIBLE
                 detailInfo.text = buildMediaInfo(item)
                 detailInfo.visibility = View.VISIBLE
-
-                Log.d("MainBrowseFragment", "Updated detail title: ${item.name}")
 
                 val posterUrl = item.getPosterUrl(SharedPrefsManager.getBaseUrl())
                 if (posterUrl != null) {
@@ -422,8 +292,6 @@ class MainBrowseFragmentNew : Fragment() {
                 detailTitle.visibility = View.VISIBLE
                 detailInfo.text = item.getTypeDisplayName(requireContext())
                 detailInfo.visibility = View.VISIBLE
-
-                Log.d("MainBrowseFragment", "Updated detail title: ${item.name}")
 
                 val posterUrl = item.getPosterUrl(SharedPrefsManager.getBaseUrl())
                 if (posterUrl != null) {
@@ -445,13 +313,10 @@ class MainBrowseFragmentNew : Fragment() {
         return parts.joinToString(" • ")
     }
 
-    private fun openMediaDetails(media: Media) {
-        val intent = Intent(requireContext(), MediaDetailsActivity::class.java).apply {
-            putExtra(MediaDetailsActivity.EXTRA_MEDIA_ID, media.id)
-            putExtra(MediaDetailsActivity.EXTRA_MEDIA_NAME, media.name)
-            putExtra(MediaDetailsActivity.EXTRA_MEDIA_POSTER, media.poster)
-            putExtra(MediaDetailsActivity.EXTRA_MEDIA_DURATION, media.duration ?: 0)
-            putExtra(MediaDetailsActivity.EXTRA_MEDIA_SIZE, media.size ?: 0L)
+    private fun openMediaPlayer(media: Media) {
+        val intent = Intent(requireContext(), PlayerActivity::class.java).apply {
+            putExtra(PlayerActivity.EXTRA_MEDIA_ID, media.id)
+            putExtra(PlayerActivity.EXTRA_MEDIA_NAME, media.name)
         }
         startActivity(intent)
     }
@@ -466,14 +331,13 @@ class MainBrowseFragmentNew : Fragment() {
         startActivity(intent)
     }
 
-    private fun showSettingsDialog() {
-        val dialog = ServerSettingsDialogFragment()
-        dialog.show(childFragmentManager, "ServerSettingsDialog")
-    }
-
     private fun showError(message: String) {
         activity?.runOnUiThread {
             Toast.makeText(requireContext(), message, Toast.LENGTH_LONG).show()
         }
+    }
+
+    companion object {
+        private const val TAG = "PlaylistDetailsGrid"
     }
 }

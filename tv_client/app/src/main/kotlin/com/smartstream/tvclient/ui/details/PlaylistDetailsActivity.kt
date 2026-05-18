@@ -22,17 +22,26 @@ class PlaylistDetailsActivity : FragmentActivity() {
         android.util.Log.d(TAG, "onCreate: =============== PlaylistDetailsActivity started ===============")
         super.onCreate(savedInstanceState)
 
+        val hasChildren = intent.getBooleanExtra(EXTRA_PLAYLIST_HAS_CHILDREN, false)
+
         android.util.Log.d(TAG, "onCreate: Extras - playlistId=${intent.getStringExtra(EXTRA_PLAYLIST_ID)}")
         android.util.Log.d(TAG, "onCreate: Extras - playlistName=${intent.getStringExtra(EXTRA_PLAYLIST_NAME)}")
         android.util.Log.d(TAG, "onCreate: Extras - playlistPoster=${intent.getStringExtra(EXTRA_PLAYLIST_POSTER)}")
-        android.util.Log.d(TAG, "onCreate: Extras - playlistHasChildren=${intent.getBooleanExtra(EXTRA_PLAYLIST_HAS_CHILDREN, false)}")
+        android.util.Log.d(TAG, "onCreate: Extras - playlistHasChildren=$hasChildren")
 
         setContentView(R.layout.activity_playlist_details)
         android.util.Log.d(TAG, "onCreate: Layout set")
 
         if (savedInstanceState == null) {
-            android.util.Log.d(TAG, "onCreate: Creating PlaylistDetailsFragment")
-            val fragment = PlaylistDetailsFragment()
+            // Choose fragment based on hasChildren flag
+            val fragment = if (hasChildren) {
+                android.util.Log.d(TAG, "onCreate: Creating PlaylistDetailsGridFragment (has children)")
+                PlaylistDetailsGridFragment()
+            } else {
+                android.util.Log.d(TAG, "onCreate: Creating PlaylistDetailsFragment (has media)")
+                PlaylistDetailsFragment()
+            }
+
             supportFragmentManager.beginTransaction()
                 .replace(R.id.details_fragment, fragment)
                 .commit()

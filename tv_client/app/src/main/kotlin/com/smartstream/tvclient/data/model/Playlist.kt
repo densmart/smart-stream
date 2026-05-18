@@ -1,6 +1,8 @@
 package com.smartstream.tvclient.data.model
 
+import android.content.Context
 import com.google.gson.annotations.SerializedName
+import com.smartstream.tvclient.R
 
 /**
  * Playlist model
@@ -46,8 +48,22 @@ data class Playlist(
     }
 
     /**
-     * Get playlist type display name
+     * Get playlist type display name (localized)
      */
+    fun getTypeDisplayName(context: Context): String {
+        return when (type) {
+            "franchise" -> context.getString(R.string.playlist_type_franchise)
+            "series" -> context.getString(R.string.playlist_type_series)
+            "favourites" -> context.getString(R.string.playlist_type_favourites)
+            else -> type.replaceFirstChar { it.uppercase() }
+        }
+    }
+
+    /**
+     * Get playlist type display name (legacy, without context)
+     * @deprecated Use getTypeDisplayName(context) instead
+     */
+    @Deprecated("Use getTypeDisplayName(context) for localized names")
     fun getTypeDisplayName(): String {
         return when (type) {
             "franchise" -> "Franchise"

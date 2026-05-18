@@ -97,7 +97,7 @@ class MediaCardAdapter(
 
         private fun bindPlaylist(playlist: Playlist) {
             title.text = playlist.name
-            info.text = playlist.getTypeDisplayName()
+            info.text = playlist.getTypeDisplayName(itemView.context)
 
             // Load poster
             val posterUrl = playlist.getPosterUrl(SharedPrefsManager.getBaseUrl())

@@ -41,7 +41,7 @@ const loadClients = async () => {
     try {
         loading.value = true;
         const response = await clientsApi.getClients({
-            page: lazyParams.value.page,
+            offset: (lazyParams.value.page - 1) * lazyParams.value.limit,
             limit: lazyParams.value.limit,
             search: lazyParams.value.search || undefined
         });
