@@ -2,6 +2,7 @@ package com.smartstream.tvclient.ui.main
 
 import android.content.Intent
 import android.os.Bundle
+import androidx.activity.OnBackPressedCallback
 import androidx.fragment.app.FragmentActivity
 import com.smartstream.tvclient.R
 import com.smartstream.tvclient.ui.auth.AuthActivity
@@ -17,7 +18,24 @@ class MainActivity : FragmentActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
+        setupBackPressHandler()
         checkAuthenticationStatus()
+    }
+
+    private fun setupBackPressHandler() {
+        onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
+            override fun handleOnBackPressed() {
+                // Check if search is active in the fragment
+                val fragment = supportFragmentManager.findFragmentById(R.id.main_browse_fragment) as? MainBrowseFragmentNew
+                if (fragment != null && fragment.isSearchActive) {
+                    // Close search instead of exiting activity
+                    fragment.closeSearch()
+                } else {
+                    // Default back behavior - exit app
+                    finish()
+                }
+            }
+        })
     }
 
     override fun onResume() {

@@ -1,0 +1,58 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    image: smart-stream:latest
+    container_name: smart-stream-backend
+    restart: unless-stopped
+    ports:
+      - "${WEB_API_PORT:-17777}:${WEB_API_PORT:-17777}"  # Web API
+      - "${TV_APP_API_PORT:-18888}:${TV_APP_API_PORT:-18888}"  # TV Client API
+    volumes:
+      - ./storage/media:/app/storage/media
+      - ./storage/posters:/app/storage/posters
+    env_file:
+      - ./backend/.env
+    environment:
+      # Storage paths mapped to host directories
+      - POSTERS_DIR=/app/storage/posters
+      - MEDIA_DIR=/app/storage/media
+    networks:
+      - smart-stream-network
+    healthcheck:
+      test: ["CMD", "sh", "-c", "wget --no-verbose --tries=1 --spider http://localhost:$${WEB_API_PORT:-17777}/ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        - VITE_API_URL=${VITE_API_URL:-http://localhost:17777}
+    image: smart-stream-frontend:latest
+    container_name: smart-stream-frontend
+    restart: unless-stopped
+    ports:
+      - "${FRONTEND_PORT:-3000}:80"
+    env_file:
+      - ./frontend/.env
+    networks:
+      - smart-stream-network
+    depends_on:
+      - backend
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:80/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+networks:
+  smart-stream-network:
+    driver: bridge

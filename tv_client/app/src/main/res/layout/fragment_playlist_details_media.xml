@@ -92,4 +92,11 @@
         android:paddingTop="@dimen/tv_margin_medium"
         android:paddingBottom="@dimen/tv_margin_medium" />
 
+    <!-- Pagination Control -->
+    <include
+        layout="@layout/pagination_control"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="@dimen/tv_margin_medium" />
+
 </LinearLayout>

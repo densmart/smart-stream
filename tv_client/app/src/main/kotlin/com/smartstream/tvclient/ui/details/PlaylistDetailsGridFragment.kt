@@ -23,6 +23,7 @@ import com.smartstream.tvclient.data.repository.MediaRepository
 import com.smartstream.tvclient.data.repository.PlaylistRepository
 import com.smartstream.tvclient.ui.main.MediaCardAdapter
 import com.smartstream.tvclient.ui.player.PlayerActivity
+import com.smartstream.tvclient.utils.PaginationHelper
 import com.smartstream.tvclient.utils.SharedPrefsManager
 import kotlinx.coroutines.launch
 
@@ -45,10 +46,16 @@ class PlaylistDetailsGridFragment : Fragment() {
     private lateinit var detailInfo: TextView
     private lateinit var detailCardContainer: View
 
+    private lateinit var paginationHelper: PaginationHelper
+
+    // Grid decoration
+    private var currentItemDecoration: RecyclerView.ItemDecoration? = null
+
     private var playlistId: String? = null
     private var playlistName: String? = null
     private var playlistPoster: String? = null
     private var playlistHasChildren: Boolean = false
+    private var currentOffset = 0
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -70,6 +77,7 @@ class PlaylistDetailsGridFragment : Fragment() {
         }
 
         initViews(view)
+        setupPagination(view)
         setupRecyclerView()
         setupBreadcrumb()
 
@@ -92,6 +100,35 @@ class PlaylistDetailsGridFragment : Fragment() {
         }
     }
 
+    private fun setupPagination(view: View) {
+        val paginationContainer = view.findViewById<View>(R.id.pagination_container)
+        val btnPrevious = view.findViewById<TextView>(R.id.btn_previous)
+        val btnNext = view.findViewById<TextView>(R.id.btn_next)
+        val paginationInfo = view.findViewById<TextView>(R.id.pagination_info)
+
+        paginationHelper = PaginationHelper(
+            paginationContainer,
+            btnPrevious,
+            btnNext,
+            paginationInfo
+        )
+
+        paginationHelper.setupListeners(
+            onPreviousClick = {
+                paginationHelper.goPrevious()?.let { newOffset ->
+                    currentOffset = newOffset
+                    loadPlaylistChildren()
+                }
+            },
+            onNextClick = {
+                paginationHelper.goNext()?.let { newOffset ->
+                    currentOffset = newOffset
+                    loadPlaylistChildren()
+                }
+            }
+        )
+    }
+
     private fun setupRecyclerView() {
         adapter = MediaCardAdapter(
             onItemClick = { item ->
@@ -110,68 +147,13 @@ class PlaylistDetailsGridFragment : Fragment() {
 
         recyclerView.adapter = adapter
 
-        // Create custom GridLayoutManager with fixed navigation
-        val customLayoutManager = object : GridLayoutManager(requireContext(), 6) {
-            override fun onInterceptFocusSearch(focused: View, direction: Int): View? {
-                val position = getPosition(focused)
-                if (position == RecyclerView.NO_POSITION) {
-                    return super.onInterceptFocusSearch(focused, direction)
-                }
-
-                val spanCount = this.spanCount
-                val itemCount = adapter.itemCount
-                val currentRow = position / spanCount
-                val currentColumn = position % spanCount
-
-                when (direction) {
-                    View.FOCUS_RIGHT -> {
-                        // If on last column, go to first item of next row
-                        if (currentColumn == spanCount - 1) {
-                            val nextRowFirstItem = (currentRow + 1) * spanCount
-                            if (nextRowFirstItem < itemCount) {
-                                recyclerView.post {
-                                    recyclerView.smoothScrollToPosition(nextRowFirstItem)
-                                    recyclerView.postDelayed({
-                                        findViewByPosition(nextRowFirstItem)?.requestFocus()
-                                    }, 100)
-                                }
-                                return focused
-                            } else {
-                                return focused
-                            }
-                        } else if (position == itemCount - 1) {
-                            return focused
-                        }
-                    }
-                    View.FOCUS_LEFT -> {
-                        // If on first column, go to last item of previous row
-                        if (currentColumn == 0) {
-                            if (currentRow > 0) {
-                                val prevRowLastItem = currentRow * spanCount - 1
-                                if (prevRowLastItem >= 0) {
-                                    recyclerView.post {
-                                        recyclerView.smoothScrollToPosition(prevRowLastItem)
-                                        recyclerView.postDelayed({
-                                            findViewByPosition(prevRowLastItem)?.requestFocus()
-                                        }, 100)
-                                    }
-                                    return focused
-                                }
-                            } else {
-                                return focused
-                            }
-                        }
-                    }
-                }
-                return super.onInterceptFocusSearch(focused, direction)
-            }
-        }
-
-        recyclerView.layoutManager = customLayoutManager
+        // Use standard GridLayoutManager - custom navigation was causing focus and layout issues
+        recyclerView.layoutManager = GridLayoutManager(requireContext(), 6)
 
         // Add spacing between cards
         val spacing = resources.getDimensionPixelSize(R.dimen.card_margin)
-        recyclerView.addItemDecoration(GridSpacingItemDecoration(6, spacing, true))
+        currentItemDecoration = GridSpacingItemDecoration(6, spacing, true)
+        recyclerView.addItemDecoration(currentItemDecoration!!)
     }
 
     /**
@@ -211,11 +193,11 @@ class PlaylistDetailsGridFragment : Fragment() {
     }
 
     private fun setupBreadcrumb() {
-        // Build breadcrumb: "Playlists > Parent Name"
+        // Build breadcrumb: "Playlists / Parent Name"
         val breadcrumb = buildString {
             append(getString(R.string.main_playlists))
             if (playlistName != null) {
-                append(" > ")
+                append(" / ")
                 append(playlistName)
             }
         }
@@ -225,16 +207,37 @@ class PlaylistDetailsGridFragment : Fragment() {
     private fun showDetailCard() {
         if (detailCardContainer.visibility == View.GONE) {
             detailCardContainer.visibility = View.VISIBLE
-            // Change to 4 columns when preview is shown
-            (recyclerView.layoutManager as? GridLayoutManager)?.spanCount = 4
+            updateGridLayout(4)
         }
     }
 
     private fun hideDetailCard() {
         if (detailCardContainer.visibility == View.VISIBLE) {
             detailCardContainer.visibility = View.GONE
-            // Change back to 6 columns when preview is hidden
-            (recyclerView.layoutManager as? GridLayoutManager)?.spanCount = 6
+            updateGridLayout(6)
+        }
+    }
+
+    private fun updateGridLayout(spanCount: Int) {
+        // Post the update to avoid modifying RecyclerView during layout pass
+        recyclerView.post {
+            (recyclerView.layoutManager as? GridLayoutManager)?.let { layoutManager ->
+                // Remove old decoration
+                currentItemDecoration?.let { decoration ->
+                    recyclerView.removeItemDecoration(decoration)
+                }
+
+                // Update span count
+                layoutManager.spanCount = spanCount
+
+                // Add new decoration with updated span count
+                val spacing = resources.getDimensionPixelSize(R.dimen.card_margin)
+                currentItemDecoration = GridSpacingItemDecoration(spanCount, spacing, true)
+                recyclerView.addItemDecoration(currentItemDecoration!!)
+
+                // Request layout recalculation
+                recyclerView.requestLayout()
+            }
         }
     }
 
@@ -243,17 +246,26 @@ class PlaylistDetailsGridFragment : Fragment() {
             try {
                 playlistId?.let { id ->
                     Log.d(TAG, "Loading children for playlist: $id")
-                    val result = playlistRepository.getPlaylistChildren(id, limit = 100, offset = 0)
-                    result.onSuccess { playlists ->
-                        Log.d(TAG, "Loaded ${playlists.size} child playlists")
-                        adapter.submitList(playlists)
+                    val result = playlistRepository.getPlaylistChildrenWithPagination(
+                        playlistId = id,
+                        offset = currentOffset
+                    )
+                    result.onSuccess { apiResponse ->
+                        if (apiResponse.isSuccess() && apiResponse.result != null) {
+                            Log.d(TAG, "Loaded ${apiResponse.result.size} child playlists")
+                            adapter.submitList(apiResponse.result)
+                            paginationHelper.update(apiResponse.pagination, currentOffset)
 
-                        // Request focus on first item after data is loaded
-                        recyclerView.postDelayed({
-                            if (adapter.itemCount > 0 && recyclerView.childCount > 0) {
-                                recyclerView.getChildAt(0)?.requestFocus()
-                            }
-                        }, 100)
+                            // Request focus on first item after data is loaded
+                            recyclerView.postDelayed({
+                                if (adapter.itemCount > 0 && recyclerView.childCount > 0) {
+                                    recyclerView.getChildAt(0)?.requestFocus()
+                                }
+                            }, 100)
+                        } else {
+                            Log.e(TAG, "API error: ${apiResponse.error}")
+                            showError(apiResponse.error ?: getString(R.string.playlists_error))
+                        }
                     }.onFailure { error ->
                         Log.e(TAG, "Failed to load children", error)
                         showError(error.message ?: getString(R.string.playlists_error))

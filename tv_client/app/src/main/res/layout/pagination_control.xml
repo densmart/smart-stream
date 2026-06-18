@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/pagination_container"
+    android:layout_width="wrap_content"
+    android:layout_height="48dp"
+    android:layout_gravity="center_horizontal"
+    android:orientation="horizontal"
+    android:gravity="center_vertical"
+    android:background="@drawable/breadcrumb_container_background"
+    android:paddingStart="24dp"
+    android:paddingEnd="24dp"
+    android:visibility="gone">
+
+    <!-- Previous Button -->
+    <TextView
+        android:id="@+id/btn_previous"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="◀ Предыдущая"
+        android:textColor="#FFFFFF"
+        android:textSize="16sp"
+        android:textStyle="bold"
+        android:paddingStart="16dp"
+        android:paddingEnd="16dp"
+        android:paddingTop="8dp"
+        android:paddingBottom="8dp"
+        android:background="@drawable/button_tab_selector"
+        android:focusable="true"
+        android:clickable="true" />
+
+    <!-- Page Info -->
+    <TextView
+        android:id="@+id/pagination_info"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="16dp"
+        android:layout_marginEnd="16dp"
+        android:text="Страница 1 из 1"
+        android:textColor="#FFFFFF"
+        android:textSize="16sp"
+        android:textStyle="bold" />
+
+    <!-- Next Button -->
+    <TextView
+        android:id="@+id/btn_next"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Следующая ▶"
+        android:textColor="#FFFFFF"
+        android:textSize="16sp"
+        android:textStyle="bold"
+        android:paddingStart="16dp"
+        android:paddingEnd="16dp"
+        android:paddingTop="8dp"
+        android:paddingBottom="8dp"
+        android:background="@drawable/button_tab_selector"
+        android:focusable="true"
+        android:clickable="true" />
+</LinearLayout>

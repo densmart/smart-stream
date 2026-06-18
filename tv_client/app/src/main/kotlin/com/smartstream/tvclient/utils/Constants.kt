@@ -20,7 +20,7 @@ object Constants {
     const val WRITE_TIMEOUT = 30L   // seconds
 
     // Pagination
-    const val DEFAULT_PAGE_LIMIT = 50
+    const val DEFAULT_PAGE_LIMIT = 12
     const val DEFAULT_PAGE_OFFSET = 0
 
     // Validation

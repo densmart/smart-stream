@@ -47,16 +47,28 @@
         </LinearLayout>
 
         <!-- Breadcrumb Navigation Center -->
-        <TextView
-            android:id="@+id/breadcrumb_text"
+        <LinearLayout
+            android:id="@+id/breadcrumb_container"
             android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
+            android:layout_height="48dp"
             android:layout_centerInParent="true"
-            android:text="Playlists"
-            android:textColor="@color/text_gray"
-            android:textSize="18sp"
-            android:ellipsize="end"
-            android:maxLines="1" />
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:background="@drawable/breadcrumb_container_background"
+            android:paddingStart="24dp"
+            android:paddingEnd="24dp">
+
+            <TextView
+                android:id="@+id/breadcrumb_text"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Playlists"
+                android:textColor="#FFFFFF"
+                android:textSize="18sp"
+                android:textStyle="bold"
+                android:maxLines="1"
+                android:ellipsize="end" />
+        </LinearLayout>
 
         <!-- Search Icon Right -->
         <ImageButton
@@ -71,26 +83,33 @@
             android:focusable="true" />
     </RelativeLayout>
 
-    <!-- Main Content: Grid + Detail Card -->
+    <!-- Main Content: Grid + Detail Card + Pagination -->
     <LinearLayout
         android:id="@+id/main_content"
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"
-        android:orientation="horizontal"
+        android:orientation="vertical"
         android:paddingStart="@dimen/tv_margin_large"
         android:paddingEnd="@dimen/tv_margin_large"
         android:paddingTop="@dimen/tv_margin_medium"
         android:paddingBottom="@dimen/tv_margin_medium">
 
-        <!-- Grid of Cards (Left 65%) -->
-        <androidx.recyclerview.widget.RecyclerView
-            android:id="@+id/cards_recycler_view"
-            android:layout_width="0dp"
-            android:layout_height="match_parent"
-            android:layout_weight="0.65"
-            android:clipToPadding="false"
-            tools:listitem="@layout/item_media_card" />
+        <!-- Grid and Detail Card Container -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:orientation="horizontal">
+
+            <!-- Grid of Cards (Left 65%) -->
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/cards_recycler_view"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="0.65"
+                android:clipToPadding="false"
+                tools:listitem="@layout/item_media_card" />
 
         <!-- Detail Card (Right 35%) -->
         <FrameLayout
@@ -152,5 +171,13 @@
                     android:ellipsize="end" />
             </LinearLayout>
         </FrameLayout>
+        </LinearLayout>
+
+        <!-- Pagination Control -->
+        <include
+            layout="@layout/pagination_control"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/tv_margin_medium" />
     </LinearLayout>
 </LinearLayout>

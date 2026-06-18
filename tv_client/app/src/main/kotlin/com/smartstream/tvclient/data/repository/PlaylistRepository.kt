@@ -35,7 +35,17 @@ class PlaylistRepository {
     }
 
     /**
-     * Get all playlists as simple list
+     * Get all playlists with pagination
+     */
+    suspend fun getPlaylistsWithPagination(
+        limit: Int = Constants.DEFAULT_PAGE_LIMIT,
+        offset: Int = Constants.DEFAULT_PAGE_OFFSET
+    ): Result<ApiResponse<List<Playlist>>> {
+        return getPlaylistsRaw(limit, offset)
+    }
+
+    /**
+     * Get all playlists as simple list (backward compatibility)
      */
     suspend fun getPlaylists(
         limit: Int = Constants.DEFAULT_PAGE_LIMIT,
@@ -86,7 +96,18 @@ class PlaylistRepository {
     }
 
     /**
-     * Get child playlists as simple list
+     * Get child playlists with pagination
+     */
+    suspend fun getPlaylistChildrenWithPagination(
+        playlistId: String,
+        limit: Int = Constants.DEFAULT_PAGE_LIMIT,
+        offset: Int = Constants.DEFAULT_PAGE_OFFSET
+    ): Result<ApiResponse<List<Playlist>>> {
+        return getPlaylistChildrenRaw(playlistId, limit, offset)
+    }
+
+    /**
+     * Get child playlists as simple list (backward compatibility)
      */
     suspend fun getPlaylistChildren(
         playlistId: String,
@@ -108,6 +129,30 @@ class PlaylistRepository {
                     Result.failure(error)
                 }
             )
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    /**
+     * Search playlists by name
+     */
+    suspend fun searchPlaylists(
+        query: String,
+        limit: Int = Constants.DEFAULT_PAGE_LIMIT,
+        offset: Int = Constants.DEFAULT_PAGE_OFFSET
+    ): Result<ApiResponse<List<Playlist>>> {
+        return try {
+            val response = apiService.getPlaylists(
+                name = query,
+                limit = limit,
+                offset = offset
+            )
+            if (response.isSuccessful && response.body() != null) {
+                Result.success(response.body()!!)
+            } else {
+                Result.failure(Exception("Failed to search playlists: ${response.code()}"))
+            }
         } catch (e: Exception) {
             Result.failure(e)
         }

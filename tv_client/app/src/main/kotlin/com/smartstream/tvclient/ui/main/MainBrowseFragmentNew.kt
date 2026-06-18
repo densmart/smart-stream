@@ -1,14 +1,20 @@
 package com.smartstream.tvclient.ui.main
 
+import android.animation.ValueAnimator
+import android.content.Context
 import android.content.Intent
 import android.graphics.Color
 import android.graphics.Rect
 import android.os.Bundle
+import android.text.Editable
+import android.text.TextWatcher
 import android.util.Log
 import android.view.KeyEvent
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.view.inputmethod.InputMethodManager
+import android.widget.EditText
 import android.widget.ImageButton
 import android.widget.ImageView
 import android.widget.TextView
@@ -26,7 +32,10 @@ import com.smartstream.tvclient.data.repository.PlaylistRepository
 import com.smartstream.tvclient.ui.details.MediaDetailsActivity
 import com.smartstream.tvclient.ui.details.PlaylistDetailsActivity
 import com.smartstream.tvclient.ui.settings.ServerSettingsDialogFragment
+import com.smartstream.tvclient.utils.PaginationHelper
 import com.smartstream.tvclient.utils.SharedPrefsManager
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 /**
@@ -51,7 +60,22 @@ class MainBrowseFragmentNew : Fragment() {
     private lateinit var detailInfo: TextView
     private lateinit var detailCardContainer: View
 
+    private lateinit var paginationHelper: PaginationHelper
+
+    // Search variables
+    private lateinit var searchInput: EditText
+    var isSearchActive = false // Public for MainActivity to check
+        private set
+    private var currentSearchQuery = ""
+    private var searchJob: Job? = null
+    private val searchWidthExpanded = 200 // dp
+
+    // Grid decoration
+    private var currentItemDecoration: RecyclerView.ItemDecoration? = null
+
     private var currentTab = Tab.MEDIA
+    private var mediaOffset = 0
+    private var playlistsOffset = 0
 
     enum class Tab {
         MEDIA, PLAYLISTS
@@ -69,6 +93,7 @@ class MainBrowseFragmentNew : Fragment() {
         super.onViewCreated(view, savedInstanceState)
 
         initViews(view)
+        setupPagination(view)
         setupRecyclerView()
         setupTabButtons()
         setupSettingsButton()
@@ -83,6 +108,7 @@ class MainBrowseFragmentNew : Fragment() {
         tabPlaylists = view.findViewById(R.id.tab_playlists)
         btnSettings = view.findViewById(R.id.btn_settings)
         btnSearch = view.findViewById(R.id.btn_search)
+        searchInput = view.findViewById(R.id.search_input)
 
         detailCardContainer = view.findViewById(R.id.detail_card_container)
 
@@ -98,6 +124,51 @@ class MainBrowseFragmentNew : Fragment() {
         detailPoster = view.findViewById(R.id.detail_poster)
         detailTitle = view.findViewById(R.id.detail_title)
         detailInfo = view.findViewById(R.id.detail_info)
+    }
+
+    private fun setupPagination(view: View) {
+        val paginationContainer = view.findViewById<View>(R.id.pagination_container)
+        val btnPrevious = view.findViewById<TextView>(R.id.btn_previous)
+        val btnNext = view.findViewById<TextView>(R.id.btn_next)
+        val paginationInfo = view.findViewById<TextView>(R.id.pagination_info)
+
+        paginationHelper = PaginationHelper(
+            paginationContainer,
+            btnPrevious,
+            btnNext,
+            paginationInfo
+        )
+
+        paginationHelper.setupListeners(
+            onPreviousClick = {
+                paginationHelper.goPrevious()?.let { newOffset ->
+                    when (currentTab) {
+                        Tab.MEDIA -> {
+                            mediaOffset = newOffset
+                            loadMediaContent()
+                        }
+                        Tab.PLAYLISTS -> {
+                            playlistsOffset = newOffset
+                            loadPlaylistsContent()
+                        }
+                    }
+                }
+            },
+            onNextClick = {
+                paginationHelper.goNext()?.let { newOffset ->
+                    when (currentTab) {
+                        Tab.MEDIA -> {
+                            mediaOffset = newOffset
+                            loadMediaContent()
+                        }
+                        Tab.PLAYLISTS -> {
+                            playlistsOffset = newOffset
+                            loadPlaylistsContent()
+                        }
+                    }
+                }
+            }
+        )
     }
 
     private fun setupRecyclerView() {
@@ -118,73 +189,13 @@ class MainBrowseFragmentNew : Fragment() {
 
         recyclerView.adapter = adapter
 
-        // Create custom GridLayoutManager with fixed navigation
-        val customLayoutManager = object : GridLayoutManager(requireContext(), 6) {
-            override fun onInterceptFocusSearch(focused: View, direction: Int): View? {
-                val position = getPosition(focused)
-                if (position == RecyclerView.NO_POSITION) {
-                    return super.onInterceptFocusSearch(focused, direction)
-                }
-
-                val spanCount = this.spanCount
-                val itemCount = adapter.itemCount
-                val currentRow = position / spanCount
-                val currentColumn = position % spanCount
-
-                when (direction) {
-                    View.FOCUS_RIGHT -> {
-                        // If on last column, go to first item of next row
-                        if (currentColumn == spanCount - 1) {
-                            val nextRowFirstItem = (currentRow + 1) * spanCount
-                            if (nextRowFirstItem < itemCount) {
-                                // Scroll to make sure the view is visible
-                                recyclerView.post {
-                                    recyclerView.smoothScrollToPosition(nextRowFirstItem)
-                                    recyclerView.postDelayed({
-                                        findViewByPosition(nextRowFirstItem)?.requestFocus()
-                                    }, 100)
-                                }
-                                // Return focused to prevent default behavior
-                                return focused
-                            } else {
-                                // No next row, stay on current item
-                                return focused
-                            }
-                        } else if (position == itemCount - 1) {
-                            // Last item overall, prevent moving right
-                            return focused
-                        }
-                    }
-                    View.FOCUS_LEFT -> {
-                        // If on first column, go to last item of previous row
-                        if (currentColumn == 0) {
-                            if (currentRow > 0) {
-                                val prevRowLastItem = currentRow * spanCount - 1
-                                if (prevRowLastItem >= 0) {
-                                    recyclerView.post {
-                                        recyclerView.smoothScrollToPosition(prevRowLastItem)
-                                        recyclerView.postDelayed({
-                                            findViewByPosition(prevRowLastItem)?.requestFocus()
-                                        }, 100)
-                                    }
-                                    return focused
-                                }
-                            } else {
-                                // First row, first column - prevent moving left
-                                return focused
-                            }
-                        }
-                    }
-                }
-                return super.onInterceptFocusSearch(focused, direction)
-            }
-        }
-
-        recyclerView.layoutManager = customLayoutManager
+        // Use standard GridLayoutManager - custom navigation was causing focus and layout issues
+        recyclerView.layoutManager = GridLayoutManager(requireContext(), 6)
 
         // Add spacing between cards
         val spacing = resources.getDimensionPixelSize(R.dimen.card_margin)
-        recyclerView.addItemDecoration(GridSpacingItemDecoration(6, spacing, true))
+        currentItemDecoration = GridSpacingItemDecoration(6, spacing, true)
+        recyclerView.addItemDecoration(currentItemDecoration!!)
 
     }
 
@@ -227,16 +238,37 @@ class MainBrowseFragmentNew : Fragment() {
     private fun showDetailCard() {
         if (detailCardContainer.visibility == View.GONE) {
             detailCardContainer.visibility = View.VISIBLE
-            // Change to 4 columns when preview is shown
-            (recyclerView.layoutManager as? GridLayoutManager)?.spanCount = 4
+            updateGridLayout(4)
         }
     }
 
     private fun hideDetailCard() {
         if (detailCardContainer.visibility == View.VISIBLE) {
             detailCardContainer.visibility = View.GONE
-            // Change back to 6 columns when preview is hidden
-            (recyclerView.layoutManager as? GridLayoutManager)?.spanCount = 6
+            updateGridLayout(6)
+        }
+    }
+
+    private fun updateGridLayout(spanCount: Int) {
+        // Post the update to avoid modifying RecyclerView during layout pass
+        recyclerView.post {
+            (recyclerView.layoutManager as? GridLayoutManager)?.let { layoutManager ->
+                // Remove old decoration
+                currentItemDecoration?.let { decoration ->
+                    recyclerView.removeItemDecoration(decoration)
+                }
+
+                // Update span count
+                layoutManager.spanCount = spanCount
+
+                // Add new decoration with updated span count
+                val spacing = resources.getDimensionPixelSize(R.dimen.card_margin)
+                currentItemDecoration = GridSpacingItemDecoration(spanCount, spacing, true)
+                recyclerView.addItemDecoration(currentItemDecoration!!)
+
+                // Request layout recalculation
+                recyclerView.requestLayout()
+            }
         }
     }
 
@@ -304,8 +336,7 @@ class MainBrowseFragmentNew : Fragment() {
         }
 
         btnSearch.setOnClickListener {
-            // TODO: Implement search functionality
-            Toast.makeText(requireContext(), "Search not implemented yet", Toast.LENGTH_SHORT).show()
+            openSearch()
         }
 
         // Intercept DOWN key for search button to focus first card
@@ -344,9 +375,21 @@ class MainBrowseFragmentNew : Fragment() {
         currentTab = tab
         updateTabSelection()
 
-        when (tab) {
-            Tab.MEDIA -> loadMediaContent()
-            Tab.PLAYLISTS -> loadPlaylistsContent()
+        // Load content for the selected tab (maintains current page/offset)
+        // If search is active, apply same query to new tab
+        if (isSearchActive && currentSearchQuery.length >= 3) {
+            lifecycleScope.launch {
+                executeSearch(currentSearchQuery)
+            }
+        } else {
+            when (tab) {
+                Tab.MEDIA -> {
+                    loadMediaContent()
+                }
+                Tab.PLAYLISTS -> {
+                    loadPlaylistsContent()
+                }
+            }
         }
     }
 
@@ -367,9 +410,24 @@ class MainBrowseFragmentNew : Fragment() {
     private fun loadMediaContent() {
         lifecycleScope.launch {
             try {
-                val result = mediaRepository.getMediaList(onlyUnassigned = true)
-                result.onSuccess { mediaList ->
-                    adapter.submitList(mediaList)
+                val result = mediaRepository.getMediaListWithPagination(
+                    onlyUnassigned = true,
+                    offset = mediaOffset
+                )
+                result.onSuccess { apiResponse ->
+                    if (apiResponse.isSuccess() && apiResponse.result != null) {
+                        adapter.submitList(apiResponse.result)
+                        paginationHelper.update(apiResponse.pagination, mediaOffset)
+
+                        // Request focus on first item after data is loaded
+                        recyclerView.postDelayed({
+                            if (adapter.itemCount > 0 && recyclerView.childCount > 0) {
+                                recyclerView.getChildAt(0)?.requestFocus()
+                            }
+                        }, 100)
+                    } else {
+                        showError(apiResponse.error ?: getString(R.string.media_error))
+                    }
                 }.onFailure { error ->
                     showError("${getString(R.string.media_error)}: ${error.message}")
                 }
@@ -382,9 +440,23 @@ class MainBrowseFragmentNew : Fragment() {
     private fun loadPlaylistsContent() {
         lifecycleScope.launch {
             try {
-                val result = playlistRepository.getPlaylists()
-                result.onSuccess { playlists ->
-                    adapter.submitList(playlists)
+                val result = playlistRepository.getPlaylistsWithPagination(
+                    offset = playlistsOffset
+                )
+                result.onSuccess { apiResponse ->
+                    if (apiResponse.isSuccess() && apiResponse.result != null) {
+                        adapter.submitList(apiResponse.result)
+                        paginationHelper.update(apiResponse.pagination, playlistsOffset)
+
+                        // Request focus on first item after data is loaded
+                        recyclerView.postDelayed({
+                            if (adapter.itemCount > 0 && recyclerView.childCount > 0) {
+                                recyclerView.getChildAt(0)?.requestFocus()
+                            }
+                        }, 100)
+                    } else {
+                        showError(apiResponse.error ?: getString(R.string.playlists_error))
+                    }
                 }.onFailure { error ->
                     showError("${getString(R.string.playlists_error)}: ${error.message}")
                 }
@@ -469,6 +541,180 @@ class MainBrowseFragmentNew : Fragment() {
     private fun showSettingsDialog() {
         val dialog = ServerSettingsDialogFragment()
         dialog.show(childFragmentManager, "ServerSettingsDialog")
+    }
+
+    // Search functionality
+    private fun openSearch() {
+        if (isSearchActive) return
+
+        isSearchActive = true
+
+        // Animate search input expansion
+        val widthInPx = (searchWidthExpanded * resources.displayMetrics.density).toInt()
+        val animator = ValueAnimator.ofInt(0, widthInPx)
+        animator.duration = 300
+        animator.addUpdateListener { valueAnimator ->
+            val layoutParams = searchInput.layoutParams
+            layoutParams.width = valueAnimator.animatedValue as Int
+            searchInput.layoutParams = layoutParams
+        }
+
+        searchInput.visibility = View.VISIBLE
+        animator.start()
+
+        // Focus search input and show keyboard
+        searchInput.postDelayed({
+            searchInput.requestFocus()
+            val imm = requireContext().getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
+            imm.showSoftInput(searchInput, InputMethodManager.SHOW_IMPLICIT)
+        }, 350)
+
+        // Setup text watcher for search
+        setupSearchWatcher()
+    }
+
+    fun closeSearch() {
+        if (!isSearchActive) return
+
+        isSearchActive = false
+        currentSearchQuery = ""
+
+        // Hide keyboard
+        val imm = requireContext().getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
+        imm.hideSoftInputFromWindow(searchInput.windowToken, 0)
+
+        // Clear search input
+        searchInput.setText("")
+
+        // Animate search input collapse
+        val animator = ValueAnimator.ofInt(searchInput.width, 0)
+        animator.duration = 300
+        animator.addUpdateListener { valueAnimator ->
+            val layoutParams = searchInput.layoutParams
+            layoutParams.width = valueAnimator.animatedValue as Int
+            searchInput.layoutParams = layoutParams
+        }
+        animator.start()
+
+        searchInput.postDelayed({
+            searchInput.visibility = View.GONE
+            btnSearch.requestFocus()
+        }, 350)
+
+        // Cancel any pending search
+        searchJob?.cancel()
+
+        // Reload normal content
+        when (currentTab) {
+            Tab.MEDIA -> {
+                mediaOffset = 0
+                loadMediaContent()
+            }
+            Tab.PLAYLISTS -> {
+                playlistsOffset = 0
+                loadPlaylistsContent()
+            }
+        }
+    }
+
+    private fun setupSearchWatcher() {
+        searchInput.addTextChangedListener(object : TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
+                val query = s?.toString() ?: ""
+                performSearch(query)
+            }
+
+            override fun afterTextChanged(s: Editable?) {}
+        })
+    }
+
+    private fun performSearch(query: String) {
+        // Cancel previous search job
+        searchJob?.cancel()
+
+        // If query is less than 3 characters, show normal list
+        if (query.length < 3) {
+            if (query.isEmpty() && currentSearchQuery.isNotEmpty()) {
+                currentSearchQuery = ""
+                // Reload normal content
+                when (currentTab) {
+                    Tab.MEDIA -> {
+                        mediaOffset = 0
+                        loadMediaContent()
+                    }
+                    Tab.PLAYLISTS -> {
+                        playlistsOffset = 0
+                        loadPlaylistsContent()
+                    }
+                }
+            }
+            return
+        }
+
+        currentSearchQuery = query
+
+        // Debounce search with 500ms delay
+        searchJob = lifecycleScope.launch {
+            delay(500)
+            executeSearch(query)
+        }
+    }
+
+    private suspend fun executeSearch(query: String) {
+        try {
+            when (currentTab) {
+                Tab.MEDIA -> searchMedia(query)
+                Tab.PLAYLISTS -> searchPlaylists(query)
+            }
+        } catch (e: Exception) {
+            showError("${getString(R.string.error)}: ${e.message}")
+        }
+    }
+
+    private suspend fun searchMedia(query: String) {
+        val result = mediaRepository.searchMedia(
+            query = query,
+            offset = mediaOffset
+        )
+        result.onSuccess { apiResponse ->
+            if (apiResponse.isSuccess() && apiResponse.result != null) {
+                adapter.submitList(apiResponse.result)
+                paginationHelper.update(apiResponse.pagination, mediaOffset)
+
+                // Show empty message if no results
+                if (apiResponse.result.isEmpty()) {
+                    showError(getString(R.string.search_results_empty))
+                }
+            } else {
+                showError(apiResponse.error ?: getString(R.string.media_error))
+            }
+        }.onFailure { error ->
+            showError("${getString(R.string.media_error)}: ${error.message}")
+        }
+    }
+
+    private suspend fun searchPlaylists(query: String) {
+        val result = playlistRepository.searchPlaylists(
+            query = query,
+            offset = playlistsOffset
+        )
+        result.onSuccess { apiResponse ->
+            if (apiResponse.isSuccess() && apiResponse.result != null) {
+                adapter.submitList(apiResponse.result)
+                paginationHelper.update(apiResponse.pagination, playlistsOffset)
+
+                // Show empty message if no results
+                if (apiResponse.result.isEmpty()) {
+                    showError(getString(R.string.search_results_empty))
+                }
+            } else {
+                showError(apiResponse.error ?: getString(R.string.playlists_error))
+            }
+        }.onFailure { error ->
+            showError("${getString(R.string.playlists_error)}: ${error.message}")
+        }
     }
 
     private fun showError(message: String) {

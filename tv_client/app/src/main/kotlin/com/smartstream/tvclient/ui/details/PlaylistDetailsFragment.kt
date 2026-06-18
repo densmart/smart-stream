@@ -17,6 +17,7 @@ import com.smartstream.tvclient.R
 import com.smartstream.tvclient.data.model.Media
 import com.smartstream.tvclient.data.repository.MediaRepository
 import com.smartstream.tvclient.ui.player.PlayerActivity
+import com.smartstream.tvclient.utils.PaginationHelper
 import com.smartstream.tvclient.utils.SharedPrefsManager
 import kotlinx.coroutines.launch
 
@@ -34,9 +35,12 @@ class PlaylistDetailsFragment : Fragment() {
     private lateinit var mediaList: RecyclerView
     private lateinit var adapter: MediaListAdapter
 
+    private lateinit var paginationHelper: PaginationHelper
+
     private var playlistId: String? = null
     private var playlistNameText: String? = null
     private var playlistPosterPath: String? = null
+    private var currentOffset = 0
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -57,6 +61,7 @@ class PlaylistDetailsFragment : Fragment() {
         }
 
         initViews(view)
+        setupPagination(view)
         setupRecyclerView()
         loadPoster()
         loadMedia()
@@ -71,6 +76,35 @@ class PlaylistDetailsFragment : Fragment() {
 
         // Set playlist name
         playlistName.text = playlistNameText ?: getString(R.string.playlists_loading)
+    }
+
+    private fun setupPagination(view: View) {
+        val paginationContainer = view.findViewById<View>(R.id.pagination_container)
+        val btnPrevious = view.findViewById<TextView>(R.id.btn_previous)
+        val btnNext = view.findViewById<TextView>(R.id.btn_next)
+        val paginationInfo = view.findViewById<TextView>(R.id.pagination_info)
+
+        paginationHelper = PaginationHelper(
+            paginationContainer,
+            btnPrevious,
+            btnNext,
+            paginationInfo
+        )
+
+        paginationHelper.setupListeners(
+            onPreviousClick = {
+                paginationHelper.goPrevious()?.let { newOffset ->
+                    currentOffset = newOffset
+                    loadMedia()
+                }
+            },
+            onNextClick = {
+                paginationHelper.goNext()?.let { newOffset ->
+                    currentOffset = newOffset
+                    loadMedia()
+                }
+            }
+        )
     }
 
     private fun setupRecyclerView() {
@@ -135,17 +169,22 @@ class PlaylistDetailsFragment : Fragment() {
             try {
                 playlistId?.let { id ->
                     android.util.Log.d(TAG, "loadMedia: Loading media for playlist $id")
-                    val result = mediaRepository.getPlaylistMedia(id, limit = 100, offset = 0)
+                    val result = mediaRepository.getPlaylistMedia(
+                        playlistId = id,
+                        offset = currentOffset
+                    )
                     result.onSuccess { apiResponse ->
                         if (apiResponse.isSuccess() && apiResponse.result != null) {
                             val media = apiResponse.result
                             android.util.Log.d(TAG, "loadMedia: Got ${media.size} media items")
 
-                            // Update episodes count
-                            episodesCount.text = getString(R.string.episodes_count, media.size)
+                            // Update episodes count with total from pagination
+                            val totalCount = apiResponse.pagination?.total ?: media.size.toLong()
+                            episodesCount.text = getString(R.string.episodes_count, totalCount.toInt())
 
                             // Submit sorted list to adapter
                             adapter.submitList(media)
+                            paginationHelper.update(apiResponse.pagination, currentOffset)
 
                             // Request focus on first item
                             mediaList.postDelayed({

@@ -59,7 +59,22 @@ class MediaRepository {
     }
 
     /**
-     * Get media list with optional filter for unassigned media
+     * Get media list with ApiResponse (includes pagination)
+     */
+    suspend fun getMediaListWithPagination(
+        onlyUnassigned: Boolean = false,
+        limit: Int = Constants.DEFAULT_PAGE_LIMIT,
+        offset: Int = Constants.DEFAULT_PAGE_OFFSET
+    ): Result<ApiResponse<List<Media>>> {
+        return if (onlyUnassigned) {
+            getUnassignedMedia(limit, offset)
+        } else {
+            getUnassignedMedia(limit, offset) // For now, same as unassigned
+        }
+    }
+
+    /**
+     * Get media list with optional filter for unassigned media (backward compatibility)
      */
     suspend fun getMediaList(
         onlyUnassigned: Boolean = false,
@@ -67,11 +82,7 @@ class MediaRepository {
         offset: Int = Constants.DEFAULT_PAGE_OFFSET
     ): Result<List<Media>> {
         return try {
-            val response = if (onlyUnassigned) {
-                getUnassignedMedia(limit, offset)
-            } else {
-                getUnassignedMedia(limit, offset) // For now, same as unassigned
-            }
+            val response = getMediaListWithPagination(onlyUnassigned, limit, offset)
 
             response.fold(
                 onSuccess = { apiResponse ->
@@ -85,6 +96,30 @@ class MediaRepository {
                     Result.failure(error)
                 }
             )
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    /**
+     * Search media by name
+     */
+    suspend fun searchMedia(
+        query: String,
+        limit: Int = Constants.DEFAULT_PAGE_LIMIT,
+        offset: Int = Constants.DEFAULT_PAGE_OFFSET
+    ): Result<ApiResponse<List<Media>>> {
+        return try {
+            val response = apiService.getUnassignedMedia(
+                name = query,
+                limit = limit,
+                offset = offset
+            )
+            if (response.isSuccessful && response.body() != null) {
+                Result.success(response.body()!!)
+            } else {
+                Result.failure(Exception("Failed to search media: ${response.code()}"))
+            }
         } catch (e: Exception) {
             Result.failure(e)
         }

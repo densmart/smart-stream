@@ -125,39 +125,73 @@
             </LinearLayout>
         </LinearLayout>
 
-        <!-- Search Icon Right -->
-        <ImageButton
-            android:id="@+id/btn_search"
-            android:layout_width="48dp"
+        <!-- Search Container Right -->
+        <LinearLayout
+            android:id="@+id/search_container"
+            android:layout_width="wrap_content"
             android:layout_height="48dp"
-            android:src="@drawable/ic_search"
-            android:background="@color/transparent"
-            android:contentDescription="@string/search"
             android:layout_alignParentEnd="true"
             android:layout_centerVertical="true"
-            android:focusable="true" />
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
+
+            <!-- Search Input Field (hidden by default) -->
+            <EditText
+                android:id="@+id/search_input"
+                android:layout_width="0dp"
+                android:layout_height="48dp"
+                android:hint="@string/search_hint"
+                android:textColor="#FFFFFF"
+                android:textColorHint="#999999"
+                android:textSize="16sp"
+                android:background="@drawable/breadcrumb_container_background"
+                android:paddingStart="16dp"
+                android:paddingEnd="16dp"
+                android:singleLine="true"
+                android:imeOptions="actionSearch"
+                android:inputType="text"
+                android:focusable="true"
+                android:visibility="gone" />
+
+            <!-- Search Button -->
+            <ImageButton
+                android:id="@+id/btn_search"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:src="@drawable/ic_search"
+                android:background="@drawable/search_button_background"
+                android:contentDescription="@string/search"
+                android:focusable="true" />
+        </LinearLayout>
     </RelativeLayout>
 
-    <!-- Main Content: Grid + Detail Card -->
+    <!-- Main Content: Grid + Detail Card + Pagination -->
     <LinearLayout
         android:id="@+id/main_content"
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"
-        android:orientation="horizontal"
+        android:orientation="vertical"
         android:paddingStart="@dimen/tv_margin_large"
         android:paddingEnd="@dimen/tv_margin_large"
         android:paddingTop="@dimen/tv_margin_medium"
         android:paddingBottom="@dimen/tv_margin_medium">
 
-        <!-- Grid of Cards (Left 65%) -->
-        <androidx.recyclerview.widget.RecyclerView
-            android:id="@+id/cards_recycler_view"
-            android:layout_width="0dp"
-            android:layout_height="match_parent"
-            android:layout_weight="0.65"
-            android:clipToPadding="false"
-            tools:listitem="@layout/item_media_card" />
+        <!-- Grid and Detail Card Container -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:orientation="horizontal">
+
+            <!-- Grid of Cards (Left 65%) -->
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/cards_recycler_view"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="0.65"
+                android:clipToPadding="false"
+                tools:listitem="@layout/item_media_card" />
 
         <!-- Detail Card (Right 35%) -->
         <FrameLayout
@@ -219,5 +253,13 @@
                     android:ellipsize="end" />
             </LinearLayout>
         </FrameLayout>
+        </LinearLayout>
+
+        <!-- Pagination Control -->
+        <include
+            layout="@layout/pagination_control"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/tv_margin_medium" />
     </LinearLayout>
 </LinearLayout>

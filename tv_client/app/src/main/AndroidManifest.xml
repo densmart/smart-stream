@@ -9,7 +9,7 @@
     <!-- Declare this is a TV app -->
     <uses-feature
         android:name="android.software.leanback"
-        android:required="true" />
+        android:required="false" />
 
     <!-- Touchscreen is not required for TV -->
     <uses-feature

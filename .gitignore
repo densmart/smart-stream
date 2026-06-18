@@ -26,6 +26,7 @@ go.work.sum
 
 # env file
 .env
+.env.production
 backend/vendor/*/
 backend/builds/
 backend/storage/

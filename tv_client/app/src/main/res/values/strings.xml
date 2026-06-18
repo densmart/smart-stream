@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <!-- App Name -->
-    <string name="app_name">Smart Stream TV</string>
+    <string name="app_name">TV BOX</string>
 
     <!-- Authentication -->
     <string name="auth_title">Sign In</string>
@@ -24,6 +24,11 @@
     <string name="tab_media">Media</string>
     <string name="tab_playlists">Playlists</string>
     <string name="search">Search</string>
+
+    <!-- Search -->
+    <string name="search_hint">Поиск...</string>
+    <string name="search_results_empty">Ничего не найдено</string>
+    <string name="search_min_chars">Минимум 3 символа для поиска</string>
 
     <!-- Media -->
     <string name="media_unassigned">Unassigned Media</string>
