@@ -34,8 +34,6 @@ services:
       - /srv/storage/media:/app/storage/media
       - /srv/storage/posters:/app/storage/posters
       - /srv/storage/downloads:/app/storage/downloads
-    env_file:
-      - ./backend/.env
     environment:
       # Storage paths mapped to host directories
       - POSTERS_DIR=/app/storage/posters
@@ -63,8 +61,6 @@ services:
     restart: unless-stopped
     ports:
       - "${FRONTEND_PORT:-3000}:80"
-    env_file:
-      - ./frontend/.env
     networks:
       - smart-stream-network
     depends_on:
