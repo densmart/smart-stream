@@ -34,10 +34,6 @@ services:
       - /srv/storage/media:/app/storage/media
       - /srv/storage/posters:/app/storage/posters
       - /srv/storage/downloads:/app/storage/downloads
-    environment:
-      # Storage paths mapped to host directories
-      - POSTERS_DIR=/app/storage/posters
-      - MEDIA_DIR=/app/storage/media
     networks:
       - smart-stream-network
     depends_on:
@@ -66,7 +62,7 @@ services:
     depends_on:
       - backend
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:80/health"]
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:$${VITE_API_URL:-17777}/health"]
       interval: 30s
       timeout: 10s
       retries: 3
