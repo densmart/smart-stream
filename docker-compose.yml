@@ -34,6 +34,8 @@ services:
       - /srv/storage/media:/app/storage/media
       - /srv/storage/posters:/app/storage/posters
       - /srv/storage/downloads:/app/storage/downloads
+    env_file:
+      - .env
     networks:
       - smart-stream-network
     depends_on:
@@ -57,6 +59,8 @@ services:
     restart: unless-stopped
     ports:
       - "${FRONTEND_PORT:-3000}:80"
+    env_file:
+      - .env
     networks:
       - smart-stream-network
     depends_on:
