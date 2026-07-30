@@ -21,6 +21,9 @@ RUN go build -a -o start_point cmd/main.go
 
 FROM alpine:3.19
 
+# Install wget for healthcheck
+RUN apk add --no-cache wget
+
 WORKDIR /app
 
 COPY --from=builder /build/start_point .
@@ -28,6 +31,6 @@ COPY --from=builder /build/start_point .
 COPY --from=builder /build/migrations ./backend/migrations
 COPY --from=builder /build/config ./backend/config
 
-EXPOSE 8000
+EXPOSE 17777 18888
 
 ENTRYPOINT ["./start_point"]

@@ -21,7 +21,15 @@ api:
 # database settings
 db:
   postgres:
-    dsn: ${POSTGRES_DSN|postgres://dbuser:dbpassword@localhost:5432/dbname?sslmode=disable}
+    # Option 1: Full DSN string (takes priority if set)
+    dsn: ${POSTGRES_DSN|}
+    # Option 2: Individual connection parameters (used if DSN is empty)
+    host: ${POSTGRES_HOST|localhost}
+    port: ${POSTGRES_PORT|5432}
+    database: ${POSTGRES_DB|smart_stream}
+    user: ${POSTGRES_USER|smartstream}
+    password: ${POSTGRES_PASSWORD|changeme}
+    sslmode: ${POSTGRES_SSLMODE|disable}
 
 # storage settings
 storage:

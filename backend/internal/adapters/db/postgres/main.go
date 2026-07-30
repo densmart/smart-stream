@@ -2,6 +2,8 @@ package postgres
 
 import (
 	"context"
+	"fmt"
+	"strings"
 
 	"github.com/densmart/smart-stream/pkg/logger"
 	"github.com/jackc/pgx/v4"
@@ -20,8 +22,19 @@ type PgDB struct {
 }
 
 func NewPostgresDB(ctx context.Context) (*PgDB, error) {
+	// Try to get full DSN first, otherwise build it from individual parameters
 	connString := viper.GetString("db.postgres.dsn")
-	logger.Debugf("connecting to DB: %s", connString)
+	if connString == "" {
+		// Build DSN from individual parameters
+		host := viper.GetString("db.postgres.host")
+		port := viper.GetInt("db.postgres.port")
+		database := viper.GetString("db.postgres.database")
+		user := viper.GetString("db.postgres.user")
+		password := viper.GetString("db.postgres.password")
+		sslmode := viper.GetString("db.postgres.sslmode")
+		connString = buildDSN(host, port, database, user, password, sslmode)
+	}
+	logger.Debugf("connecting to DB: %s", maskPassword(connString))
 	conf, err := pgxpool.ParseConfig(connString) // Using environment variables instead of a connection string.
 	if err != nil {
 		logger.Errorf("%s", err.Error())
@@ -89,4 +102,25 @@ func getConnection(ctx context.Context, pool *pgxpool.Pool) error {
 		return err
 	}
 	return nil
+}
+
+// buildDSN constructs PostgreSQL connection string from individual parameters
+func buildDSN(host string, port int, database, user, password, sslmode string) string {
+	return fmt.Sprintf("postgres://%s:%s@%s:%d/%s?sslmode=%s",
+		user, password, host, port, database, sslmode)
+}
+
+// maskPassword masks password in DSN for logging
+func maskPassword(dsn string) string {
+	// Find password part: between "://" and "@"
+	if idx := strings.Index(dsn, "://"); idx != -1 {
+		if atIdx := strings.Index(dsn[idx+3:], "@"); atIdx != -1 {
+			beforeAt := dsn[idx+3 : idx+3+atIdx]
+			if colonIdx := strings.Index(beforeAt, ":"); colonIdx != -1 {
+				user := beforeAt[:colonIdx]
+				return dsn[:idx+3] + user + ":****@" + dsn[idx+3+atIdx+1:]
+			}
+		}
+	}
+	return dsn
 }
