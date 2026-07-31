@@ -21,8 +21,8 @@ RUN go build -a -o start_point cmd/main.go
 
 FROM alpine:3.19
 
-# Install wget for healthcheck
-RUN apk add --no-cache wget
+# Install wget for healthcheck and ffmpeg for media metadata extraction
+RUN apk add --no-cache wget ffmpeg
 
 WORKDIR /app
 
