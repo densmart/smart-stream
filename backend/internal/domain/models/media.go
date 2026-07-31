@@ -8,7 +8,7 @@ type Media struct {
 	Format     string  `db:"format" json:"format"`
 	Path       string  `db:"path" json:"path"`
 	Duration   int     `db:"duration" json:"duration"`
-	Size       int     `db:"size" json:"size"`
+	Size       uint64  `db:"size" json:"size"`
 	Order      int     `db:"order" json:"order"`
 }
 

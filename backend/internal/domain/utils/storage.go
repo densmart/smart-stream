@@ -16,8 +16,8 @@ import (
 
 // MediaMetadata содержит информацию о медиа-файле
 type MediaMetadata struct {
-	Duration int // Длительность в секундах
-	Size     int // Размер файла в байтах
+	Duration int    // Длительность в секундах
+	Size     uint64 // Размер файла в байтах
 }
 
 // FileSystemItemType тип элемента файловой системы
@@ -33,7 +33,7 @@ type FileSystemItem struct {
 	Name       string
 	Type       FileSystemItemType
 	Path       string
-	Size       *int64
+	Size       *uint64
 	Format     *string
 	ModifiedAt *time.Time
 }
@@ -79,7 +79,7 @@ func GetMediaMetadata(filePath string) (*MediaMetadata, error) {
 	}
 
 	// Получаем размер файла
-	fileSize := int(fileInfo.Size())
+	fileSize := uint64(fileInfo.Size())
 
 	// Используем ffprobe для получения длительности
 	ctx, cancelFn := context.WithTimeout(context.Background(), 10*time.Second)
@@ -200,7 +200,7 @@ func BrowseDirectory(basePath, relativePath string) ([]FileSystemItem, string, e
 			// Это файл - проверяем, что это поддерживаемый формат
 			ext := strings.ToLower(filepath.Ext(entry.Name()))
 			if supportedFormats[ext] {
-				size := info.Size()
+				size := uint64(info.Size())
 				modTime := info.ModTime()
 				format := strings.TrimPrefix(ext, ".")
 

@@ -7,7 +7,7 @@ type CreateMediaDTO struct {
 	Format     string  `json:"format" binding:"required"`
 	Path       string  `json:"path" binding:"required"`
 	Duration   *int    `json:"duration" binding:"omitempty,min=0"`
-	Size       *int    `json:"size" binding:"omitempty,min=0"`
+	Size       *uint64 `json:"size" binding:"omitempty,min=0"`
 	Order      *int    `json:"order"`
 }
 
@@ -18,7 +18,7 @@ type UpdateMediaDTO struct {
 	Format     *string `json:"format"`
 	Path       *string `json:"path"`
 	Duration   *int    `json:"duration"`
-	Size       *int    `json:"size"`
+	Size       *uint64 `json:"size"`
 	Order      *int    `json:"order"`
 }
 
@@ -40,7 +40,7 @@ type MediaDTO struct {
 	Format     string  `json:"format"`
 	Path       string  `json:"path"`
 	Duration   int     `json:"duration"`
-	Size       int     `json:"size"`
+	Size       uint64  `json:"size"`
 	Order      int     `json:"order"`
 }
 
@@ -99,7 +99,7 @@ type FileSystemItemDTO struct {
 	Name       string             `json:"name"`
 	Type       FileSystemItemType `json:"type"`
 	Path       string             `json:"path"`
-	Size       *int64             `json:"size,omitempty"`        // Only for files
+	Size       *uint64            `json:"size,omitempty"`        // Only for files
 	Format     *string            `json:"format,omitempty"`      // Only for files
 	ModifiedAt *string            `json:"modified_at,omitempty"` // Only for files
 }
