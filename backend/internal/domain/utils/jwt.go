@@ -7,9 +7,6 @@ import (
 	"github.com/golang-jwt/jwt/v4"
 )
 
-const (
-	accessTokenTTL = 24 * time.Hour
-)
 
 type JwtAuth struct {
 	apiKey string
@@ -34,12 +31,12 @@ type AccessTokenClaims struct {
 	UserName string `json:"user_name"`
 }
 
-// GenerateAccessToken generates access token
-func (ja *JwtAuth) GenerateAccessToken() (string, error) {
+// GenerateAccessToken generates access token with custom TTL
+func (ja *JwtAuth) GenerateAccessToken(ttl time.Duration) (string, error) {
 	claims := AccessTokenClaims{
 		jwt.RegisteredClaims{
 			ExpiresAt: &jwt.NumericDate{
-				Time: time.Now().Add(accessTokenTTL),
+				Time: time.Now().Add(ttl),
 			},
 			IssuedAt: &jwt.NumericDate{
 				Time: time.Now(),

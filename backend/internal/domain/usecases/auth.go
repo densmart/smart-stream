@@ -24,8 +24,8 @@ func WebSignIn(data dto.SignInRequestDTO) (*dto.AuthResponseDTO, *UCError) {
 		}
 	}
 
-	// generate JWT
-	accessToken, ucErr := generateJWT(data.Login)
+	// generate JWT with 24 hour TTL for web
+	accessToken, ucErr := generateJWT(data.Login, 24*time.Hour)
 	if ucErr != nil {
 		return nil, ucErr
 	}
@@ -77,8 +77,8 @@ func ClientSignIn(oltp repo.OltpRepo, data dto.SignInRequestDTO) (*dto.AuthRespo
 		logger.Debugf("failed to update last_login_at for client %s: %v", client.ID, dbErr)
 	}
 
-	// Генерация JWT
-	accessToken, ucErr := generateJWT(client.Login)
+	// Генерация JWT with 180 day TTL for TV client
+	accessToken, ucErr := generateJWT(client.Login, 180*24*time.Hour)
 	if ucErr != nil {
 		return nil, ucErr
 	}
@@ -88,11 +88,11 @@ func ClientSignIn(oltp repo.OltpRepo, data dto.SignInRequestDTO) (*dto.AuthRespo
 	}, nil
 }
 
-func generateJWT(login string) (string, *UCError) {
+func generateJWT(login string, ttl time.Duration) (string, *UCError) {
 	apiKey := viper.GetString("app.jwt-secret")
 
 	jwtWrapper := utils.NewJwtAuth(apiKey, login)
-	accessToken, err := jwtWrapper.GenerateAccessToken()
+	accessToken, err := jwtWrapper.GenerateAccessToken(ttl)
 	if err != nil {
 		logger.Debugf("error generating access token: %s", err.Error())
 		return "", &UCError{
