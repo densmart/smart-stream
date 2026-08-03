@@ -8,7 +8,6 @@ import android.graphics.Rect
 import android.os.Bundle
 import android.text.Editable
 import android.text.TextWatcher
-import android.util.Log
 import android.view.KeyEvent
 import android.view.LayoutInflater
 import android.view.View
@@ -16,14 +15,12 @@ import android.view.ViewGroup
 import android.view.inputmethod.InputMethodManager
 import android.widget.EditText
 import android.widget.ImageButton
-import android.widget.ImageView
 import android.widget.TextView
 import android.widget.Toast
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
-import com.bumptech.glide.Glide
 import com.smartstream.tvclient.R
 import com.smartstream.tvclient.data.model.Media
 import com.smartstream.tvclient.data.model.Playlist
@@ -51,14 +48,11 @@ class MainBrowseFragmentNew : Fragment() {
     private lateinit var adapter: MediaCardAdapter
 
     private lateinit var tabMedia: TextView
-    private lateinit var tabPlaylists: TextView
+    private lateinit var tabSeries: TextView
+    private lateinit var tabFranchise: TextView
+    private lateinit var tabCartoon: TextView
     private lateinit var btnSettings: ImageButton
     private lateinit var btnSearch: ImageButton
-
-    private lateinit var detailPoster: ImageView
-    private lateinit var detailTitle: TextView
-    private lateinit var detailInfo: TextView
-    private lateinit var detailCardContainer: View
 
     private lateinit var paginationHelper: PaginationHelper
 
@@ -70,15 +64,14 @@ class MainBrowseFragmentNew : Fragment() {
     private var searchJob: Job? = null
     private val searchWidthExpanded = 200 // dp
 
-    // Grid decoration
-    private var currentItemDecoration: RecyclerView.ItemDecoration? = null
-
     private var currentTab = Tab.MEDIA
     private var mediaOffset = 0
-    private var playlistsOffset = 0
+    private var seriesOffset = 0
+    private var franchiseOffset = 0
+    private var cartoonOffset = 0
 
     enum class Tab {
-        MEDIA, PLAYLISTS
+        MEDIA, SERIES, FRANCHISE, CARTOON
     }
 
     override fun onCreateView(
@@ -105,25 +98,22 @@ class MainBrowseFragmentNew : Fragment() {
     private fun initViews(view: View) {
         recyclerView = view.findViewById(R.id.cards_recycler_view)
         tabMedia = view.findViewById(R.id.tab_media)
-        tabPlaylists = view.findViewById(R.id.tab_playlists)
+        tabSeries = view.findViewById(R.id.tab_series)
+        tabFranchise = view.findViewById(R.id.tab_franchise)
+        tabCartoon = view.findViewById(R.id.tab_cartoon)
         btnSettings = view.findViewById(R.id.btn_settings)
         btnSearch = view.findViewById(R.id.btn_search)
         searchInput = view.findViewById(R.id.search_input)
 
-        detailCardContainer = view.findViewById(R.id.detail_card_container)
-
         // Force visibility and text properties
         tabMedia.visibility = View.VISIBLE
-        tabPlaylists.visibility = View.VISIBLE
+        tabSeries.visibility = View.VISIBLE
+        tabFranchise.visibility = View.VISIBLE
+        tabCartoon.visibility = View.VISIBLE
         tabMedia.alpha = 1f
-        tabPlaylists.alpha = 1f
-
-        // Set text programmatically to ensure it's there
-        tabMedia.text = "Media"
-        tabPlaylists.text = "Playlists"
-        detailPoster = view.findViewById(R.id.detail_poster)
-        detailTitle = view.findViewById(R.id.detail_title)
-        detailInfo = view.findViewById(R.id.detail_info)
+        tabSeries.alpha = 1f
+        tabFranchise.alpha = 1f
+        tabCartoon.alpha = 1f
     }
 
     private fun setupPagination(view: View) {
@@ -147,9 +137,17 @@ class MainBrowseFragmentNew : Fragment() {
                             mediaOffset = newOffset
                             loadMediaContent()
                         }
-                        Tab.PLAYLISTS -> {
-                            playlistsOffset = newOffset
-                            loadPlaylistsContent()
+                        Tab.SERIES -> {
+                            seriesOffset = newOffset
+                            loadSeriesContent()
+                        }
+                        Tab.FRANCHISE -> {
+                            franchiseOffset = newOffset
+                            loadFranchiseContent()
+                        }
+                        Tab.CARTOON -> {
+                            cartoonOffset = newOffset
+                            loadCartoonContent()
                         }
                     }
                 }
@@ -161,9 +159,17 @@ class MainBrowseFragmentNew : Fragment() {
                             mediaOffset = newOffset
                             loadMediaContent()
                         }
-                        Tab.PLAYLISTS -> {
-                            playlistsOffset = newOffset
-                            loadPlaylistsContent()
+                        Tab.SERIES -> {
+                            seriesOffset = newOffset
+                            loadSeriesContent()
+                        }
+                        Tab.FRANCHISE -> {
+                            franchiseOffset = newOffset
+                            loadFranchiseContent()
+                        }
+                        Tab.CARTOON -> {
+                            cartoonOffset = newOffset
+                            loadCartoonContent()
                         }
                     }
                 }
@@ -180,22 +186,26 @@ class MainBrowseFragmentNew : Fragment() {
                 }
             },
             onItemFocus = { item ->
-                updateDetailCard(item)
+                // Detail card preview disabled - no action needed
             },
             onFocusLost = {
-                // Will be handled by recycler view focus listener
+                // Detail card preview disabled - no action needed
             }
         )
 
         recyclerView.adapter = adapter
 
-        // Use standard GridLayoutManager - custom navigation was causing focus and layout issues
+        // Use standard GridLayoutManager with native TV focus handling
         recyclerView.layoutManager = GridLayoutManager(requireContext(), 6)
+
+        // Enable native focus search for proper TV navigation
+        recyclerView.isFocusable = false
+        recyclerView.isFocusableInTouchMode = false
 
         // Add spacing between cards
         val spacing = resources.getDimensionPixelSize(R.dimen.card_margin)
-        currentItemDecoration = GridSpacingItemDecoration(6, spacing, true)
-        recyclerView.addItemDecoration(currentItemDecoration!!)
+        val itemDecoration = GridSpacingItemDecoration(6, spacing, true)
+        recyclerView.addItemDecoration(itemDecoration)
 
     }
 
@@ -235,94 +245,57 @@ class MainBrowseFragmentNew : Fragment() {
         }
     }
 
-    private fun showDetailCard() {
-        if (detailCardContainer.visibility == View.GONE) {
-            detailCardContainer.visibility = View.VISIBLE
-            updateGridLayout(4)
-        }
-    }
-
-    private fun hideDetailCard() {
-        if (detailCardContainer.visibility == View.VISIBLE) {
-            detailCardContainer.visibility = View.GONE
-            updateGridLayout(6)
-        }
-    }
-
-    private fun updateGridLayout(spanCount: Int) {
-        // Post the update to avoid modifying RecyclerView during layout pass
-        recyclerView.post {
-            (recyclerView.layoutManager as? GridLayoutManager)?.let { layoutManager ->
-                // Remove old decoration
-                currentItemDecoration?.let { decoration ->
-                    recyclerView.removeItemDecoration(decoration)
-                }
-
-                // Update span count
-                layoutManager.spanCount = spanCount
-
-                // Add new decoration with updated span count
-                val spacing = resources.getDimensionPixelSize(R.dimen.card_margin)
-                currentItemDecoration = GridSpacingItemDecoration(spanCount, spacing, true)
-                recyclerView.addItemDecoration(currentItemDecoration!!)
-
-                // Request layout recalculation
-                recyclerView.requestLayout()
-            }
-        }
-    }
-
     private fun setupTabButtons() {
         tabMedia.setOnClickListener {
             switchTab(Tab.MEDIA)
         }
 
-        tabPlaylists.setOnClickListener {
-            switchTab(Tab.PLAYLISTS)
+        tabSeries.setOnClickListener {
+            switchTab(Tab.SERIES)
         }
 
-        // Intercept DOWN key to focus first card
-        val downKeyListener = View.OnKeyListener { _, keyCode, event ->
-            if (keyCode == KeyEvent.KEYCODE_DPAD_DOWN && event.action == KeyEvent.ACTION_DOWN) {
-                recyclerView.post {
-                    recyclerView.scrollToPosition(0)
-                    recyclerView.postDelayed({
-                        val firstViewHolder = recyclerView.findViewHolderForAdapterPosition(0)
-                        firstViewHolder?.itemView?.requestFocus()
-                    }, 50)
-                }
-                true
-            } else {
-                false
-            }
+        tabFranchise.setOnClickListener {
+            switchTab(Tab.FRANCHISE)
         }
 
-        tabMedia.setOnKeyListener(downKeyListener)
-        tabPlaylists.setOnKeyListener(downKeyListener)
-        btnSettings.setOnKeyListener(downKeyListener)
+        tabCartoon.setOnClickListener {
+            switchTab(Tab.CARTOON)
+        }
 
-        // Hide preview when tabs receive focus and update text color
+        // Remove custom DOWN key handling - let Android handle navigation naturally
+
+        // Update text color on focus
         val grayColor = Color.parseColor("#999999")
 
         tabMedia.setOnFocusChangeListener { _, hasFocus ->
             if (hasFocus) {
-                hideDetailCard()
-                // Dark text on focused background (light gray)
                 tabMedia.setTextColor(Color.BLACK)
             } else {
-                // Restore color based on selection: selected = black, not selected = gray
                 tabMedia.setTextColor(if (currentTab == Tab.MEDIA) Color.BLACK else grayColor)
             }
         }
 
-        tabPlaylists.setOnFocusChangeListener { _, hasFocus ->
+        tabSeries.setOnFocusChangeListener { _, hasFocus ->
             if (hasFocus) {
-                hideDetailCard()
-                // Dark text on focused background (light gray)
-                tabPlaylists.setTextColor(Color.BLACK)
+                tabSeries.setTextColor(Color.BLACK)
             } else {
-                // Restore color based on selection: selected = black, not selected = gray
-                tabPlaylists.setTextColor(if (currentTab == Tab.PLAYLISTS) Color.BLACK else grayColor)
+                tabSeries.setTextColor(if (currentTab == Tab.SERIES) Color.BLACK else grayColor)
+            }
+        }
+
+        tabFranchise.setOnFocusChangeListener { _, hasFocus ->
+            if (hasFocus) {
+                tabFranchise.setTextColor(Color.BLACK)
+            } else {
+                tabFranchise.setTextColor(if (currentTab == Tab.FRANCHISE) Color.BLACK else grayColor)
+            }
+        }
+
+        tabCartoon.setOnFocusChangeListener { _, hasFocus ->
+            if (hasFocus) {
+                tabCartoon.setTextColor(Color.BLACK)
+            } else {
+                tabCartoon.setTextColor(if (currentTab == Tab.CARTOON) Color.BLACK else grayColor)
             }
         }
 
@@ -337,35 +310,6 @@ class MainBrowseFragmentNew : Fragment() {
 
         btnSearch.setOnClickListener {
             openSearch()
-        }
-
-        // Intercept DOWN key for search button to focus first card
-        btnSearch.setOnKeyListener { _, keyCode, event ->
-            if (keyCode == KeyEvent.KEYCODE_DPAD_DOWN && event.action == KeyEvent.ACTION_DOWN) {
-                recyclerView.post {
-                    recyclerView.scrollToPosition(0)
-                    recyclerView.postDelayed({
-                        val firstViewHolder = recyclerView.findViewHolderForAdapterPosition(0)
-                        firstViewHolder?.itemView?.requestFocus()
-                    }, 50)
-                }
-                true
-            } else {
-                false
-            }
-        }
-
-        // Hide preview when settings or search receive focus
-        btnSettings.setOnFocusChangeListener { _, hasFocus ->
-            if (hasFocus) {
-                hideDetailCard()
-            }
-        }
-
-        btnSearch.setOnFocusChangeListener { _, hasFocus ->
-            if (hasFocus) {
-                hideDetailCard()
-            }
         }
     }
 
@@ -383,28 +327,32 @@ class MainBrowseFragmentNew : Fragment() {
             }
         } else {
             when (tab) {
-                Tab.MEDIA -> {
-                    loadMediaContent()
-                }
-                Tab.PLAYLISTS -> {
-                    loadPlaylistsContent()
-                }
+                Tab.MEDIA -> loadMediaContent()
+                Tab.SERIES -> loadSeriesContent()
+                Tab.FRANCHISE -> loadFranchiseContent()
+                Tab.CARTOON -> loadCartoonContent()
             }
         }
     }
 
     private fun updateTabSelection() {
         tabMedia.isSelected = (currentTab == Tab.MEDIA)
-        tabPlaylists.isSelected = (currentTab == Tab.PLAYLISTS)
+        tabSeries.isSelected = (currentTab == Tab.SERIES)
+        tabFranchise.isSelected = (currentTab == Tab.FRANCHISE)
+        tabCartoon.isSelected = (currentTab == Tab.CARTOON)
 
         // Update text color: selected = black on white, not selected = gray on transparent
         val grayColor = Color.parseColor("#999999")
         tabMedia.setTextColor(if (currentTab == Tab.MEDIA) Color.BLACK else grayColor)
-        tabPlaylists.setTextColor(if (currentTab == Tab.PLAYLISTS) Color.BLACK else grayColor)
+        tabSeries.setTextColor(if (currentTab == Tab.SERIES) Color.BLACK else grayColor)
+        tabFranchise.setTextColor(if (currentTab == Tab.FRANCHISE) Color.BLACK else grayColor)
+        tabCartoon.setTextColor(if (currentTab == Tab.CARTOON) Color.BLACK else grayColor)
 
         // Ensure alpha is set to fully opaque
         tabMedia.alpha = 1f
-        tabPlaylists.alpha = 1f
+        tabSeries.alpha = 1f
+        tabFranchise.alpha = 1f
+        tabCartoon.alpha = 1f
     }
 
     private fun loadMediaContent() {
@@ -418,13 +366,6 @@ class MainBrowseFragmentNew : Fragment() {
                     if (apiResponse.isSuccess() && apiResponse.result != null) {
                         adapter.submitList(apiResponse.result)
                         paginationHelper.update(apiResponse.pagination, mediaOffset)
-
-                        // Request focus on first item after data is loaded
-                        recyclerView.postDelayed({
-                            if (adapter.itemCount > 0 && recyclerView.childCount > 0) {
-                                recyclerView.getChildAt(0)?.requestFocus()
-                            }
-                        }, 100)
                     } else {
                         showError(apiResponse.error ?: getString(R.string.media_error))
                     }
@@ -437,23 +378,17 @@ class MainBrowseFragmentNew : Fragment() {
         }
     }
 
-    private fun loadPlaylistsContent() {
+    private fun loadSeriesContent() {
         lifecycleScope.launch {
             try {
                 val result = playlistRepository.getPlaylistsWithPagination(
-                    offset = playlistsOffset
+                    offset = seriesOffset,
+                    type = "series"
                 )
                 result.onSuccess { apiResponse ->
                     if (apiResponse.isSuccess() && apiResponse.result != null) {
                         adapter.submitList(apiResponse.result)
-                        paginationHelper.update(apiResponse.pagination, playlistsOffset)
-
-                        // Request focus on first item after data is loaded
-                        recyclerView.postDelayed({
-                            if (adapter.itemCount > 0 && recyclerView.childCount > 0) {
-                                recyclerView.getChildAt(0)?.requestFocus()
-                            }
-                        }, 100)
+                        paginationHelper.update(apiResponse.pagination, seriesOffset)
                     } else {
                         showError(apiResponse.error ?: getString(R.string.playlists_error))
                     }
@@ -466,55 +401,50 @@ class MainBrowseFragmentNew : Fragment() {
         }
     }
 
-    private fun updateDetailCard(item: Any) {
-        // Show detail card and adjust grid columns
-        showDetailCard()
-
-        when (item) {
-            is Media -> {
-                detailTitle.text = item.name
-                detailTitle.visibility = View.VISIBLE
-                detailInfo.text = buildMediaInfo(item)
-                detailInfo.visibility = View.VISIBLE
-
-                Log.d("MainBrowseFragment", "Updated detail title: ${item.name}")
-
-                val posterUrl = item.getPosterUrl(SharedPrefsManager.getBaseUrl())
-                if (posterUrl != null) {
-                    Glide.with(this)
-                        .load(posterUrl)
-                        .error(R.drawable.ic_media_placeholder)
-                        .into(detailPoster)
-                } else {
-                    detailPoster.setImageResource(R.drawable.ic_media_placeholder)
+    private fun loadFranchiseContent() {
+        lifecycleScope.launch {
+            try {
+                val result = playlistRepository.getPlaylistsWithPagination(
+                    offset = franchiseOffset,
+                    type = "franchise"
+                )
+                result.onSuccess { apiResponse ->
+                    if (apiResponse.isSuccess() && apiResponse.result != null) {
+                        adapter.submitList(apiResponse.result)
+                        paginationHelper.update(apiResponse.pagination, franchiseOffset)
+                    } else {
+                        showError(apiResponse.error ?: getString(R.string.playlists_error))
+                    }
+                }.onFailure { error ->
+                    showError("${getString(R.string.playlists_error)}: ${error.message}")
                 }
-            }
-            is Playlist -> {
-                detailTitle.text = item.name
-                detailTitle.visibility = View.VISIBLE
-                detailInfo.text = item.getTypeDisplayName(requireContext())
-                detailInfo.visibility = View.VISIBLE
-
-                Log.d("MainBrowseFragment", "Updated detail title: ${item.name}")
-
-                val posterUrl = item.getPosterUrl(SharedPrefsManager.getBaseUrl())
-                if (posterUrl != null) {
-                    Glide.with(this)
-                        .load(posterUrl)
-                        .error(R.drawable.ic_playlist_placeholder)
-                        .into(detailPoster)
-                } else {
-                    detailPoster.setImageResource(R.drawable.ic_playlist_placeholder)
-                }
+            } catch (e: Exception) {
+                showError("${getString(R.string.error)}: ${e.message}")
             }
         }
     }
 
-    private fun buildMediaInfo(media: Media): String {
-        val parts = mutableListOf<String>()
-        media.getFormattedDuration()?.let { parts.add(it) }
-        media.getFormattedSize()?.let { parts.add(it) }
-        return parts.joinToString(" • ")
+    private fun loadCartoonContent() {
+        lifecycleScope.launch {
+            try {
+                val result = playlistRepository.getPlaylistsWithPagination(
+                    offset = cartoonOffset,
+                    type = "cartoon"
+                )
+                result.onSuccess { apiResponse ->
+                    if (apiResponse.isSuccess() && apiResponse.result != null) {
+                        adapter.submitList(apiResponse.result)
+                        paginationHelper.update(apiResponse.pagination, cartoonOffset)
+                    } else {
+                        showError(apiResponse.error ?: getString(R.string.playlists_error))
+                    }
+                }.onFailure { error ->
+                    showError("${getString(R.string.playlists_error)}: ${error.message}")
+                }
+            } catch (e: Exception) {
+                showError("${getString(R.string.error)}: ${e.message}")
+            }
+        }
     }
 
     private fun openMediaDetails(media: Media) {
@@ -610,9 +540,17 @@ class MainBrowseFragmentNew : Fragment() {
                 mediaOffset = 0
                 loadMediaContent()
             }
-            Tab.PLAYLISTS -> {
-                playlistsOffset = 0
-                loadPlaylistsContent()
+            Tab.SERIES -> {
+                seriesOffset = 0
+                loadSeriesContent()
+            }
+            Tab.FRANCHISE -> {
+                franchiseOffset = 0
+                loadFranchiseContent()
+            }
+            Tab.CARTOON -> {
+                cartoonOffset = 0
+                loadCartoonContent()
             }
         }
     }
@@ -644,9 +582,17 @@ class MainBrowseFragmentNew : Fragment() {
                         mediaOffset = 0
                         loadMediaContent()
                     }
-                    Tab.PLAYLISTS -> {
-                        playlistsOffset = 0
-                        loadPlaylistsContent()
+                    Tab.SERIES -> {
+                        seriesOffset = 0
+                        loadSeriesContent()
+                    }
+                    Tab.FRANCHISE -> {
+                        franchiseOffset = 0
+                        loadFranchiseContent()
+                    }
+                    Tab.CARTOON -> {
+                        cartoonOffset = 0
+                        loadCartoonContent()
                     }
                 }
             }
@@ -666,7 +612,9 @@ class MainBrowseFragmentNew : Fragment() {
         try {
             when (currentTab) {
                 Tab.MEDIA -> searchMedia(query)
-                Tab.PLAYLISTS -> searchPlaylists(query)
+                Tab.SERIES -> searchSeries(query)
+                Tab.FRANCHISE -> searchFranchise(query)
+                Tab.CARTOON -> searchCartoon(query)
             }
         } catch (e: Exception) {
             showError("${getString(R.string.error)}: ${e.message}")
@@ -695,15 +643,62 @@ class MainBrowseFragmentNew : Fragment() {
         }
     }
 
-    private suspend fun searchPlaylists(query: String) {
+    private suspend fun searchSeries(query: String) {
         val result = playlistRepository.searchPlaylists(
             query = query,
-            offset = playlistsOffset
+            offset = seriesOffset,
+            type = "series"
         )
         result.onSuccess { apiResponse ->
             if (apiResponse.isSuccess() && apiResponse.result != null) {
                 adapter.submitList(apiResponse.result)
-                paginationHelper.update(apiResponse.pagination, playlistsOffset)
+                paginationHelper.update(apiResponse.pagination, seriesOffset)
+
+                // Show empty message if no results
+                if (apiResponse.result.isEmpty()) {
+                    showError(getString(R.string.search_results_empty))
+                }
+            } else {
+                showError(apiResponse.error ?: getString(R.string.playlists_error))
+            }
+        }.onFailure { error ->
+            showError("${getString(R.string.playlists_error)}: ${error.message}")
+        }
+    }
+
+    private suspend fun searchFranchise(query: String) {
+        val result = playlistRepository.searchPlaylists(
+            query = query,
+            offset = franchiseOffset,
+            type = "franchise"
+        )
+        result.onSuccess { apiResponse ->
+            if (apiResponse.isSuccess() && apiResponse.result != null) {
+                adapter.submitList(apiResponse.result)
+                paginationHelper.update(apiResponse.pagination, franchiseOffset)
+
+                // Show empty message if no results
+                if (apiResponse.result.isEmpty()) {
+                    showError(getString(R.string.search_results_empty))
+                }
+            } else {
+                showError(apiResponse.error ?: getString(R.string.playlists_error))
+            }
+        }.onFailure { error ->
+            showError("${getString(R.string.playlists_error)}: ${error.message}")
+        }
+    }
+
+    private suspend fun searchCartoon(query: String) {
+        val result = playlistRepository.searchPlaylists(
+            query = query,
+            offset = cartoonOffset,
+            type = "cartoon"
+        )
+        result.onSuccess { apiResponse ->
+            if (apiResponse.isSuccess() && apiResponse.result != null) {
+                adapter.submitList(apiResponse.result)
+                paginationHelper.update(apiResponse.pagination, cartoonOffset)
 
                 // Show empty message if no results
                 if (apiResponse.result.isEmpty()) {

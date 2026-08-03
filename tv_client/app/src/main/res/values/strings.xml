@@ -21,8 +21,10 @@
     <string name="main_logout">Logout</string>
 
     <!-- Tabs -->
-    <string name="tab_media">Media</string>
-    <string name="tab_playlists">Playlists</string>
+    <string name="tab_media">Фильмы</string>
+    <string name="tab_series">Сериалы</string>
+    <string name="tab_franchise">Франшизы</string>
+    <string name="tab_cartoon">Мульты</string>
     <string name="search">Search</string>
 
     <!-- Search -->

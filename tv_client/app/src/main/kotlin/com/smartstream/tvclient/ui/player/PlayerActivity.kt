@@ -9,7 +9,9 @@ import com.google.android.exoplayer2.MediaItem
 import com.google.android.exoplayer2.PlaybackException
 import com.google.android.exoplayer2.Player
 import com.google.android.exoplayer2.source.DefaultMediaSourceFactory
+import com.google.android.exoplayer2.trackselection.DefaultTrackSelector
 import com.google.android.exoplayer2.ui.PlayerView
+import android.app.AlertDialog
 import com.google.android.exoplayer2.upstream.DataSource
 import com.google.android.exoplayer2.upstream.DefaultDataSource
 import com.google.android.exoplayer2.upstream.DefaultHttpDataSource
@@ -29,6 +31,7 @@ class PlayerActivity : FragmentActivity() {
 
     private var player: ExoPlayer? = null
     private lateinit var playerView: PlayerView
+    private lateinit var trackSelector: DefaultTrackSelector
 
     private var mediaId: String? = null
     private var mediaName: String? = null
@@ -85,6 +88,12 @@ class PlayerActivity : FragmentActivity() {
             playerView = findViewById(R.id.player_view)
             Log.d(TAG, "onCreate: PlayerView found")
 
+            // Setup track selection button
+            setupTrackSelectionButton()
+
+            // Setup button visibility to follow player controls
+            setupButtonVisibility()
+
             // Load playlist media if playlist ID is provided
             if (playlistId != null) {
                 loadPlaylistMedia()
@@ -110,10 +119,22 @@ class PlayerActivity : FragmentActivity() {
             val streamUrl = buildStreamUrl(mediaId!!)
             Log.d(TAG, "initializePlayer: Stream URL = $streamUrl")
 
+            // Create track selector with settings for audio and subtitles
+            Log.d(TAG, "initializePlayer: Creating TrackSelector")
+            trackSelector = DefaultTrackSelector(this).apply {
+                parameters = buildUponParameters()
+                    .setPreferredAudioLanguages("ru", "rus", "en", "eng") // Prefer Russian, then English
+                    .setPreferredTextLanguages("ru", "rus", "en", "eng") // Prefer Russian, then English subtitles
+                    .setSelectUndeterminedTextLanguage(true) // Allow subtitles without language tag
+                    .build()
+            }
+            Log.d(TAG, "initializePlayer: TrackSelector created with language preferences")
+
             // Create player
             Log.d(TAG, "initializePlayer: Creating ExoPlayer instance")
             player = ExoPlayer.Builder(this)
                 .setMediaSourceFactory(DefaultMediaSourceFactory(dataSourceFactory))
+                .setTrackSelector(trackSelector)
                 .build()
                 .also { exoPlayer ->
                     Log.d(TAG, "initializePlayer: ExoPlayer instance created")
@@ -150,6 +171,11 @@ class PlayerActivity : FragmentActivity() {
                                 else -> "UNKNOWN"
                             }
                             Log.d(TAG, "onPlaybackStateChanged: $stateString")
+
+                            // Log available tracks when player is ready
+                            if (playbackState == Player.STATE_READY) {
+                                logAvailableTracks(exoPlayer)
+                            }
 
                             if (playbackState == Player.STATE_ENDED) {
                                 // Video finished, clear saved position
@@ -316,6 +342,14 @@ class PlayerActivity : FragmentActivity() {
         Log.e(TAG, "handlePlayerError: Error type = ${error.javaClass.simpleName}")
 
         val errorMessage = when (error.errorCode) {
+            PlaybackException.ERROR_CODE_DECODER_INIT_FAILED -> {
+                Log.e(TAG, "handlePlayerError: Decoder init failed - likely unsupported codec")
+
+                // Try to recover by selecting the first supported audio track
+                tryRecoverFromDecoderError()
+
+                "Audio codec not supported. Switching to another track..."
+            }
             PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED -> {
                 Log.e(TAG, "handlePlayerError: Network connection failed")
                 "Network connection failed"
@@ -349,10 +383,54 @@ class PlayerActivity : FragmentActivity() {
         Log.e(TAG, "handlePlayerError: Showing error to user: $errorMessage")
         Toast.makeText(this, errorMessage, Toast.LENGTH_LONG).show()
 
-        // Don't finish immediately, give user time to see the error
-        playerView.postDelayed({
-            finish()
-        }, 3000)
+        // Only finish for fatal errors, not for decoder errors (we try to recover)
+        if (error.errorCode != PlaybackException.ERROR_CODE_DECODER_INIT_FAILED) {
+            // Don't finish immediately, give user time to see the error
+            playerView.postDelayed({
+                finish()
+            }, 3000)
+        }
+    }
+
+    private fun tryRecoverFromDecoderError() {
+        try {
+            Log.d(TAG, "tryRecoverFromDecoderError: Attempting to find supported audio track")
+
+            val tracks = player?.currentTracks ?: return
+            val audioGroups = tracks.groups.filter { it.type == com.google.android.exoplayer2.C.TRACK_TYPE_AUDIO }
+
+            // Find first supported audio track
+            for ((groupIndex, group) in audioGroups.withIndex()) {
+                for (i in 0 until group.length) {
+                    if (group.isTrackSupported(i)) {
+                        val format = group.getTrackFormat(i)
+                        Log.d(TAG, "tryRecoverFromDecoderError: Found supported track: ${format.label ?: format.language}")
+
+                        // Clear any overrides and select this track
+                        trackSelector.parameters = trackSelector.buildUponParameters()
+                            .clearOverridesOfType(com.google.android.exoplayer2.C.TRACK_TYPE_AUDIO)
+                            .addOverride(
+                                com.google.android.exoplayer2.trackselection.TrackSelectionOverride(
+                                    group.mediaTrackGroup,
+                                    listOf(i)
+                                )
+                            )
+                            .build()
+
+                        // Retry playback
+                        player?.prepare()
+
+                        Toast.makeText(this, "Switched to: ${format.label ?: format.language}", Toast.LENGTH_SHORT).show()
+                        return
+                    }
+                }
+            }
+
+            Log.w(TAG, "tryRecoverFromDecoderError: No supported audio tracks found")
+            Toast.makeText(this, "No supported audio tracks available", Toast.LENGTH_LONG).show()
+        } catch (e: Exception) {
+            Log.e(TAG, "tryRecoverFromDecoderError: Failed to recover", e)
+        }
     }
 
     override fun onPause() {
@@ -402,5 +480,278 @@ class PlayerActivity : FragmentActivity() {
         Log.d(TAG, "releasePlayer: Releasing player resources")
         player?.release()
         player = null
+    }
+
+    private fun setupTrackSelectionButton() {
+        try {
+            // Find our custom track selection button
+            val trackSelectionButton = findViewById<android.widget.ImageButton>(R.id.btn_track_selection)
+
+            trackSelectionButton.setOnClickListener {
+                Log.d(TAG, "Track selection button clicked")
+
+                if (player == null || !::trackSelector.isInitialized) {
+                    Log.w(TAG, "Player or TrackSelector not initialized")
+                    Toast.makeText(this, "Player not ready", Toast.LENGTH_SHORT).show()
+                    return@setOnClickListener
+                }
+
+                showTrackSelectionDialog()
+            }
+
+            Log.d(TAG, "setupTrackSelectionButton: Track selection button handler set")
+        } catch (e: Exception) {
+            Log.e(TAG, "setupTrackSelectionButton: Failed to setup button", e)
+        }
+    }
+
+    private fun setupButtonVisibility() {
+        try {
+            val trackSelectionButton = findViewById<android.widget.ImageButton>(R.id.btn_track_selection)
+
+            // Set visibility controller listener
+            playerView.setControllerVisibilityListener { visibility ->
+                // Show/hide button along with player controls
+                trackSelectionButton.visibility = visibility
+                Log.d(TAG, "Track selection button visibility: $visibility")
+            }
+
+            // Initially hide the button
+            trackSelectionButton.visibility = android.view.View.GONE
+
+            Log.d(TAG, "setupButtonVisibility: Button visibility controller set")
+        } catch (e: Exception) {
+            Log.e(TAG, "setupButtonVisibility: Failed to setup visibility", e)
+        }
+    }
+
+    private fun showTrackSelectionDialog() {
+        val player = this.player ?: return
+        val tracks = player.currentTracks
+
+        val options = mutableListOf<String>()
+        val actions = mutableListOf<() -> Unit>()
+
+        // Audio tracks
+        val audioTracks = tracks.groups.filter { it.type == com.google.android.exoplayer2.C.TRACK_TYPE_AUDIO }
+        if (audioTracks.isNotEmpty()) {
+            options.add("--- Audio Tracks ---")
+            actions.add { }
+
+            audioTracks.forEachIndexed { groupIndex, group ->
+                for (i in 0 until group.length) {
+                    val format = group.getTrackFormat(i)
+                    val language = format.language ?: "Unknown"
+                    val trackLabel = format.label ?: language
+
+                    // Check if track is supported
+                    val isSupported = group.isTrackSupported(i)
+
+                    // Build display name: "Label (language)" or just "Label" if no language
+                    var displayName = if (format.label != null && format.language != null) {
+                        "$trackLabel ($language)"
+                    } else {
+                        trackLabel
+                    }
+
+                    // Mark unsupported tracks
+                    if (!isSupported) {
+                        displayName += " [not supported]"
+                    }
+
+                    val isSelected = group.isTrackSelected(i)
+                    val label = if (isSelected) "✓ $displayName" else "  $displayName"
+
+                    options.add(label)
+                    actions.add {
+                        if (!isSupported) {
+                            Toast.makeText(this, "This audio codec is not supported on your device", Toast.LENGTH_LONG).show()
+                            Log.w(TAG, "Attempted to select unsupported audio track: $displayName (${format.sampleMimeType})")
+                        } else {
+                            // Select this specific audio track by overriding track selection
+                            selectAudioTrack(groupIndex, i)
+                            Log.d(TAG, "Selected audio track: $displayName")
+                        }
+                    }
+                }
+            }
+        }
+
+        // Subtitle tracks
+        val subtitleTracks = tracks.groups.filter { it.type == com.google.android.exoplayer2.C.TRACK_TYPE_TEXT }
+        if (subtitleTracks.isNotEmpty()) {
+            options.add("--- Subtitles ---")
+            actions.add { }
+
+            // Add "Disable subtitles" option
+            options.add("  Disable subtitles")
+            actions.add {
+                disableSubtitles()
+                Log.d(TAG, "Disabled subtitles")
+            }
+
+            subtitleTracks.forEachIndexed { groupIndex, group ->
+                for (i in 0 until group.length) {
+                    val format = group.getTrackFormat(i)
+                    val language = format.language ?: "Unknown"
+                    val trackLabel = format.label ?: language
+
+                    // Build display name: "Label (language)" or just "Label" if no language
+                    val displayName = if (format.label != null && format.language != null) {
+                        "$trackLabel ($language)"
+                    } else {
+                        trackLabel
+                    }
+
+                    val isSelected = group.isTrackSelected(i)
+                    val label = if (isSelected) "✓ $displayName" else "  $displayName"
+
+                    options.add(label)
+                    actions.add {
+                        // Select this specific subtitle track
+                        selectSubtitleTrack(groupIndex, i)
+                        Log.d(TAG, "Selected subtitle track: $displayName")
+                    }
+                }
+            }
+        }
+
+        if (options.isEmpty()) {
+            Toast.makeText(this, "No tracks available", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        AlertDialog.Builder(this)
+            .setTitle("Select Track")
+            .setItems(options.toTypedArray()) { dialog, which ->
+                if (which < actions.size) {
+                    actions[which].invoke()
+                }
+                dialog.dismiss()
+            }
+            .setNegativeButton("Cancel") { dialog, _ ->
+                dialog.dismiss()
+            }
+            .show()
+    }
+
+    private fun selectAudioTrack(groupIndex: Int, trackIndex: Int) {
+        try {
+            val tracks = player?.currentTracks ?: return
+            val audioGroups = tracks.groups.filter { it.type == com.google.android.exoplayer2.C.TRACK_TYPE_AUDIO }
+
+            if (groupIndex >= audioGroups.size) {
+                Log.e(TAG, "Invalid audio group index: $groupIndex")
+                return
+            }
+
+            val group = audioGroups[groupIndex]
+            val format = group.getTrackFormat(trackIndex)
+
+            // Override track selection to force this specific track
+            trackSelector.parameters = trackSelector.buildUponParameters()
+                .clearOverridesOfType(com.google.android.exoplayer2.C.TRACK_TYPE_AUDIO)
+                .addOverride(
+                    com.google.android.exoplayer2.trackselection.TrackSelectionOverride(
+                        group.mediaTrackGroup,
+                        listOf(trackIndex)
+                    )
+                )
+                .build()
+
+            Log.d(TAG, "Audio track selected: ${format.label ?: format.language}")
+            Toast.makeText(this, "Audio: ${format.label ?: format.language}", Toast.LENGTH_SHORT).show()
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to select audio track", e)
+            Toast.makeText(this, "Failed to select audio track", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private fun selectSubtitleTrack(groupIndex: Int, trackIndex: Int) {
+        try {
+            val tracks = player?.currentTracks ?: return
+            val textGroups = tracks.groups.filter { it.type == com.google.android.exoplayer2.C.TRACK_TYPE_TEXT }
+
+            if (groupIndex >= textGroups.size) {
+                Log.e(TAG, "Invalid subtitle group index: $groupIndex")
+                return
+            }
+
+            val group = textGroups[groupIndex]
+            val format = group.getTrackFormat(trackIndex)
+
+            // Override track selection to force this specific track
+            trackSelector.parameters = trackSelector.buildUponParameters()
+                .clearOverridesOfType(com.google.android.exoplayer2.C.TRACK_TYPE_TEXT)
+                .addOverride(
+                    com.google.android.exoplayer2.trackselection.TrackSelectionOverride(
+                        group.mediaTrackGroup,
+                        listOf(trackIndex)
+                    )
+                )
+                .build()
+
+            Log.d(TAG, "Subtitle track selected: ${format.label ?: format.language}")
+            Toast.makeText(this, "Subtitles: ${format.label ?: format.language}", Toast.LENGTH_SHORT).show()
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to select subtitle track", e)
+            Toast.makeText(this, "Failed to select subtitle track", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private fun disableSubtitles() {
+        try {
+            // Disable all text tracks
+            trackSelector.parameters = trackSelector.buildUponParameters()
+                .clearOverridesOfType(com.google.android.exoplayer2.C.TRACK_TYPE_TEXT)
+                .setTrackTypeDisabled(com.google.android.exoplayer2.C.TRACK_TYPE_TEXT, true)
+                .build()
+
+            Log.d(TAG, "Subtitles disabled")
+            Toast.makeText(this, "Subtitles disabled", Toast.LENGTH_SHORT).show()
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to disable subtitles", e)
+        }
+    }
+
+    private fun logAvailableTracks(player: ExoPlayer) {
+        try {
+            val tracks = player.currentTracks
+            Log.d(TAG, "========== Available Tracks ==========")
+
+            // Log audio tracks
+            val audioTracks = tracks.groups.filter { it.type == com.google.android.exoplayer2.C.TRACK_TYPE_AUDIO }
+            Log.d(TAG, "Audio tracks found: ${audioTracks.size}")
+            audioTracks.forEachIndexed { index, group ->
+                for (i in 0 until group.length) {
+                    val format = group.getTrackFormat(i)
+                    val language = format.language ?: "unknown"
+                    val label = format.label ?: "no label"
+                    val codec = format.sampleMimeType ?: format.codecs ?: "unknown"
+                    val channelCount = format.channelCount
+                    val bitrate = format.bitrate / 1000 // Convert to kbps
+                    val isSupported = group.isTrackSupported(i)
+                    val supportedStr = if (isSupported) "✓" else "✗"
+                    Log.d(TAG, "  Audio #$index: $supportedStr $label ($language, $codec, ${channelCount}ch, ${bitrate}kbps)")
+                }
+            }
+
+            // Log subtitle tracks
+            val subtitleTracks = tracks.groups.filter { it.type == com.google.android.exoplayer2.C.TRACK_TYPE_TEXT }
+            Log.d(TAG, "Subtitle tracks found: ${subtitleTracks.size}")
+            subtitleTracks.forEachIndexed { index, group ->
+                for (i in 0 until group.length) {
+                    val format = group.getTrackFormat(i)
+                    val language = format.language ?: "unknown"
+                    val label = format.label ?: "no label"
+                    val mimeType = format.sampleMimeType ?: "unknown"
+                    Log.d(TAG, "  Subtitle #$index: $label ($language, $mimeType)")
+                }
+            }
+
+            Log.d(TAG, "======================================")
+        } catch (e: Exception) {
+            Log.e(TAG, "Error logging tracks", e)
+        }
     }
 }

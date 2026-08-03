@@ -17,12 +17,14 @@ class PlaylistRepository {
      */
     suspend fun getPlaylistsRaw(
         limit: Int = Constants.DEFAULT_PAGE_LIMIT,
-        offset: Int = Constants.DEFAULT_PAGE_OFFSET
+        offset: Int = Constants.DEFAULT_PAGE_OFFSET,
+        type: String? = null
     ): Result<ApiResponse<List<Playlist>>> {
         return try {
             val response = apiService.getPlaylists(
                 limit = limit,
-                offset = offset
+                offset = offset,
+                type = type
             )
             if (response.isSuccessful && response.body() != null) {
                 Result.success(response.body()!!)
@@ -39,9 +41,10 @@ class PlaylistRepository {
      */
     suspend fun getPlaylistsWithPagination(
         limit: Int = Constants.DEFAULT_PAGE_LIMIT,
-        offset: Int = Constants.DEFAULT_PAGE_OFFSET
+        offset: Int = Constants.DEFAULT_PAGE_OFFSET,
+        type: String? = null
     ): Result<ApiResponse<List<Playlist>>> {
-        return getPlaylistsRaw(limit, offset)
+        return getPlaylistsRaw(limit, offset, type)
     }
 
     /**
@@ -140,13 +143,15 @@ class PlaylistRepository {
     suspend fun searchPlaylists(
         query: String,
         limit: Int = Constants.DEFAULT_PAGE_LIMIT,
-        offset: Int = Constants.DEFAULT_PAGE_OFFSET
+        offset: Int = Constants.DEFAULT_PAGE_OFFSET,
+        type: String? = null
     ): Result<ApiResponse<List<Playlist>>> {
         return try {
             val response = apiService.getPlaylists(
                 name = query,
                 limit = limit,
-                offset = offset
+                offset = offset,
+                type = type
             )
             if (response.isSuccessful && response.body() != null) {
                 Result.success(response.body()!!)

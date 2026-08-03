@@ -10,4 +10,18 @@
         android:layout_height="match_parent"
         android:keepScreenOn="true" />
 
+    <ImageButton
+        android:id="@+id/btn_track_selection"
+        android:layout_width="56dp"
+        android:layout_height="56dp"
+        android:layout_gravity="bottom|end"
+        android:layout_margin="16dp"
+        android:background="@drawable/button_track_selector"
+        android:contentDescription="Select tracks"
+        android:focusable="true"
+        android:clickable="true"
+        android:padding="12dp"
+        android:scaleType="fitCenter"
+        android:src="@android:drawable/ic_menu_preferences" />
+
 </FrameLayout>

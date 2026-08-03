@@ -102,24 +102,20 @@
             android:layout_weight="1"
             android:orientation="horizontal">
 
-            <!-- Grid of Cards (Left 65%) -->
+            <!-- Grid of Cards (Full Width) -->
             <androidx.recyclerview.widget.RecyclerView
                 android:id="@+id/cards_recycler_view"
-                android:layout_width="0dp"
+                android:layout_width="match_parent"
                 android:layout_height="match_parent"
-                android:layout_weight="0.65"
                 android:clipToPadding="false"
                 tools:listitem="@layout/item_media_card" />
 
-        <!-- Detail Card (Right 35%) -->
+        <!-- Detail Card - DISABLED -->
         <FrameLayout
             android:id="@+id/detail_card_container"
             android:layout_width="0dp"
             android:layout_height="match_parent"
-            android:layout_weight="0.35"
-            android:layout_marginStart="@dimen/tv_margin_large"
-            android:background="@drawable/detail_card_background"
-            android:padding="@dimen/tv_padding_large"
+            android:layout_weight="0"
             android:visibility="gone">
 
             <LinearLayout

@@ -4,18 +4,15 @@ import android.content.Intent
 import android.graphics.Rect
 import android.os.Bundle
 import android.util.Log
-import android.view.KeyEvent
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import android.widget.ImageView
 import android.widget.TextView
 import android.widget.Toast
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
-import com.bumptech.glide.Glide
 import com.smartstream.tvclient.R
 import com.smartstream.tvclient.data.model.Media
 import com.smartstream.tvclient.data.model.Playlist
@@ -41,15 +38,7 @@ class PlaylistDetailsGridFragment : Fragment() {
     private lateinit var breadcrumbText: TextView
     private lateinit var btnSearch: View
 
-    private lateinit var detailPoster: ImageView
-    private lateinit var detailTitle: TextView
-    private lateinit var detailInfo: TextView
-    private lateinit var detailCardContainer: View
-
     private lateinit var paginationHelper: PaginationHelper
-
-    // Grid decoration
-    private var currentItemDecoration: RecyclerView.ItemDecoration? = null
 
     private var playlistId: String? = null
     private var playlistName: String? = null
@@ -89,10 +78,6 @@ class PlaylistDetailsGridFragment : Fragment() {
         recyclerView = view.findViewById(R.id.cards_recycler_view)
         breadcrumbText = view.findViewById(R.id.breadcrumb_text)
         btnSearch = view.findViewById(R.id.btn_search)
-        detailCardContainer = view.findViewById(R.id.detail_card_container)
-        detailPoster = view.findViewById(R.id.detail_poster)
-        detailTitle = view.findViewById(R.id.detail_title)
-        detailInfo = view.findViewById(R.id.detail_info)
 
         // Setup search button click
         btnSearch.setOnClickListener {
@@ -138,22 +123,26 @@ class PlaylistDetailsGridFragment : Fragment() {
                 }
             },
             onItemFocus = { item ->
-                updateDetailCard(item)
+                // Detail card preview disabled - no action needed
             },
             onFocusLost = {
-                // Will be handled by recycler view focus listener
+                // Detail card preview disabled - no action needed
             }
         )
 
         recyclerView.adapter = adapter
 
-        // Use standard GridLayoutManager - custom navigation was causing focus and layout issues
+        // Use standard GridLayoutManager with native TV focus handling
         recyclerView.layoutManager = GridLayoutManager(requireContext(), 6)
+
+        // Enable native focus search for proper TV navigation
+        recyclerView.isFocusable = false
+        recyclerView.isFocusableInTouchMode = false
 
         // Add spacing between cards
         val spacing = resources.getDimensionPixelSize(R.dimen.card_margin)
-        currentItemDecoration = GridSpacingItemDecoration(6, spacing, true)
-        recyclerView.addItemDecoration(currentItemDecoration!!)
+        val itemDecoration = GridSpacingItemDecoration(6, spacing, true)
+        recyclerView.addItemDecoration(itemDecoration)
     }
 
     /**
@@ -204,43 +193,6 @@ class PlaylistDetailsGridFragment : Fragment() {
         breadcrumbText.text = breadcrumb
     }
 
-    private fun showDetailCard() {
-        if (detailCardContainer.visibility == View.GONE) {
-            detailCardContainer.visibility = View.VISIBLE
-            updateGridLayout(4)
-        }
-    }
-
-    private fun hideDetailCard() {
-        if (detailCardContainer.visibility == View.VISIBLE) {
-            detailCardContainer.visibility = View.GONE
-            updateGridLayout(6)
-        }
-    }
-
-    private fun updateGridLayout(spanCount: Int) {
-        // Post the update to avoid modifying RecyclerView during layout pass
-        recyclerView.post {
-            (recyclerView.layoutManager as? GridLayoutManager)?.let { layoutManager ->
-                // Remove old decoration
-                currentItemDecoration?.let { decoration ->
-                    recyclerView.removeItemDecoration(decoration)
-                }
-
-                // Update span count
-                layoutManager.spanCount = spanCount
-
-                // Add new decoration with updated span count
-                val spacing = resources.getDimensionPixelSize(R.dimen.card_margin)
-                currentItemDecoration = GridSpacingItemDecoration(spanCount, spacing, true)
-                recyclerView.addItemDecoration(currentItemDecoration!!)
-
-                // Request layout recalculation
-                recyclerView.requestLayout()
-            }
-        }
-    }
-
     private fun loadPlaylistChildren() {
         lifecycleScope.launch {
             try {
@@ -255,13 +207,6 @@ class PlaylistDetailsGridFragment : Fragment() {
                             Log.d(TAG, "Loaded ${apiResponse.result.size} child playlists")
                             adapter.submitList(apiResponse.result)
                             paginationHelper.update(apiResponse.pagination, currentOffset)
-
-                            // Request focus on first item after data is loaded
-                            recyclerView.postDelayed({
-                                if (adapter.itemCount > 0 && recyclerView.childCount > 0) {
-                                    recyclerView.getChildAt(0)?.requestFocus()
-                                }
-                            }, 100)
                         } else {
                             Log.e(TAG, "API error: ${apiResponse.error}")
                             showError(apiResponse.error ?: getString(R.string.playlists_error))
@@ -276,53 +221,6 @@ class PlaylistDetailsGridFragment : Fragment() {
                 showError(e.message ?: getString(R.string.error))
             }
         }
-    }
-
-    private fun updateDetailCard(item: Any) {
-        // Show detail card and adjust grid columns
-        showDetailCard()
-
-        when (item) {
-            is Media -> {
-                detailTitle.text = item.name
-                detailTitle.visibility = View.VISIBLE
-                detailInfo.text = buildMediaInfo(item)
-                detailInfo.visibility = View.VISIBLE
-
-                val posterUrl = item.getPosterUrl(SharedPrefsManager.getBaseUrl())
-                if (posterUrl != null) {
-                    Glide.with(this)
-                        .load(posterUrl)
-                        .error(R.drawable.ic_media_placeholder)
-                        .into(detailPoster)
-                } else {
-                    detailPoster.setImageResource(R.drawable.ic_media_placeholder)
-                }
-            }
-            is Playlist -> {
-                detailTitle.text = item.name
-                detailTitle.visibility = View.VISIBLE
-                detailInfo.text = item.getTypeDisplayName(requireContext())
-                detailInfo.visibility = View.VISIBLE
-
-                val posterUrl = item.getPosterUrl(SharedPrefsManager.getBaseUrl())
-                if (posterUrl != null) {
-                    Glide.with(this)
-                        .load(posterUrl)
-                        .error(R.drawable.ic_playlist_placeholder)
-                        .into(detailPoster)
-                } else {
-                    detailPoster.setImageResource(R.drawable.ic_playlist_placeholder)
-                }
-            }
-        }
-    }
-
-    private fun buildMediaInfo(media: Media): String {
-        val parts = mutableListOf<String>()
-        media.getFormattedDuration()?.let { parts.add(it) }
-        media.getFormattedSize()?.let { parts.add(it) }
-        return parts.joinToString(" • ")
     }
 
     private fun openMediaPlayer(media: Media) {
