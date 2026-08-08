@@ -1,6 +1,6 @@
 <script setup>
-import { ref, onMounted, computed } from 'vue';
-import { mediaApi, uploadApi, playlistsApi } from '@/api';
+import { ref, onMounted } from 'vue';
+import { mediaApi, uploadApi } from '@/api';
 import { useToast } from 'primevue/usetoast';
 import FileBrowser from '@/components/FileBrowser.vue';
 
@@ -16,11 +16,6 @@ const isEditMode = ref(false);
 const selectedMedia = ref(null);
 const uploadingPoster = ref(false);
 const showFileBrowser = ref(false);
-
-// Filter by playlist
-const filteredPlaylists = ref([]);
-const selectedPlaylist = ref(null);
-const loadingPlaylists = ref(false);
 
 // Form data
 const formData = ref({
@@ -39,9 +34,12 @@ const posterPreviewUrl = ref(null);
 // Pagination
 const lazyParams = ref({
     page: 1,
-    limit: 12, // Using 12 for a nice grid layout
+    limit: 24,
     search: ''
 });
+
+// Search functionality
+const searchQuery = ref('');
 
 // Format options
 const formatOptions = [
@@ -64,15 +62,9 @@ const loadMedia = async () => {
         const params = {
             offset: (lazyParams.value.page - 1) * lazyParams.value.limit,
             limit: lazyParams.value.limit,
-            search: lazyParams.value.search || undefined
+            name: lazyParams.value.search || undefined,
+            only_unassigned: true
         };
-
-        // Filter by playlist or show only unassigned
-        if (selectedPlaylist.value) {
-            params.playlist_id = selectedPlaylist.value.id;
-        } else {
-            params.only_unassigned = true;
-        }
 
         const response = await mediaApi.getMedia(params);
         mediaList.value = response.result;
@@ -89,42 +81,15 @@ const loadMedia = async () => {
     }
 };
 
-// Autocomplete search for playlists using new API endpoint
-const searchPlaylistsForFilter = async (event) => {
-    try {
-        loadingPlaylists.value = true;
-        const query = event.query;
-        // Call new search API endpoint with name parameter
-        const results = await playlistsApi.searchPlaylists(query || undefined);
-        filteredPlaylists.value = results;
-    } catch (error) {
-        toast.add({
-            severity: 'error',
-            summary: 'Error',
-            detail: 'Failed to search playlists',
-            life: 3000
-        });
-        filteredPlaylists.value = [];
-    } finally {
-        loadingPlaylists.value = false;
-    }
-};
-
-// Apply playlist filter
-const applyPlaylistFilter = () => {
+// Search handler
+const onSearch = () => {
+    lazyParams.value.search = searchQuery.value;
     lazyParams.value.page = 1;
     loadMedia();
 };
 
-// Clear playlist filter
-const clearPlaylistFilter = () => {
-    selectedPlaylist.value = null;
-    applyPlaylistFilter();
-};
-
 const onPage = (event) => {
     lazyParams.value.page = event.page + 1;
-    lazyParams.value.limit = event.rows;
     loadMedia();
 };
 
@@ -365,50 +330,15 @@ onMounted(() => {
 
         <div class="flex justify-between items-center mb-6">
             <h5 class="mb-0">Media Management</h5>
-            <Button label="Add Media" icon="pi pi-plus" @click="openCreateDialog" />
+            <Button label="Add Movie" icon="pi pi-plus" @click="openCreateDialog" />
         </div>
 
-        <!-- Filter by Playlist -->
+        <!-- Search Field -->
         <div class="mb-4">
-            <div class="flex items-center">
-                <div class="relative inline-block">
-                    <AutoComplete
-                        id="playlistFilter"
-                        v-model="selectedPlaylist"
-                        :suggestions="filteredPlaylists"
-                        @complete="searchPlaylistsForFilter"
-                        optionLabel="name"
-                        placeholder="Filter by playlist"
-                        :loading="loadingPlaylists"
-                        :inputStyle="{ width: '24rem', paddingRight: selectedPlaylist ? '2.5rem' : '0.75rem' }"
-                    >
-                        <template #option="slotProps">
-                            <div class="flex items-center gap-2">
-                                <i class="pi pi-list text-surface-500"></i>
-                                <span>{{ slotProps.option.name }}</span>
-                            </div>
-                        </template>
-                    </AutoComplete>
-                    <Button
-                        v-if="selectedPlaylist"
-                        icon="pi pi-times"
-                        text
-                        rounded
-                        severity="secondary"
-                        @click="clearPlaylistFilter"
-                        title="Clear filter"
-                        class="!absolute"
-                        style="right: 0.25rem; top: 50%; transform: translateY(-50%); width: 2rem; height: 2rem; z-index: 10;"
-                    />
-                </div>
-                <Button
-                    icon="pi pi-filter"
-                    label="Filter"
-                    @click="applyPlaylistFilter"
-                    title="Apply filter"
-                    class="ml-2"
-                />
-            </div>
+            <IconField>
+                <InputIcon class="pi pi-search" />
+                <InputText v-model="searchQuery" placeholder="Search movies..." @keyup.enter="onSearch" @input="onSearch" class="w-full md:w-96" />
+            </IconField>
         </div>
 
         <!-- Grid View -->
@@ -416,16 +346,8 @@ onMounted(() => {
             <div v-for="media in mediaList" :key="media.id" class="col-span-12 sm:col-span-6 md:col-span-4 xl:col-span-3">
                 <div class="card mb-0 p-4">
                     <div class="relative mb-4">
-                        <img
-                            v-if="media.poster"
-                            :src="getPosterUrl(media.poster)"
-                            :alt="media.name"
-                            class="w-full h-48 object-cover rounded-border"
-                        />
-                        <div
-                            v-else
-                            class="w-full h-48 bg-surface-100 dark:bg-surface-700 rounded-border flex items-center justify-center"
-                        >
+                        <img v-if="media.poster" :src="getPosterUrl(media.poster)" :alt="media.name" class="w-full h-48 object-cover rounded-border" />
+                        <div v-else class="w-full h-48 bg-surface-100 dark:bg-surface-700 rounded-border flex items-center justify-center">
                             <i class="pi pi-video text-6xl text-surface-400"></i>
                         </div>
                         <Tag :value="media.format.toUpperCase()" class="absolute top-2 right-2" severity="info" />
@@ -434,41 +356,21 @@ onMounted(() => {
                         <h6 class="mb-1">{{ media.name }}</h6>
                         <p class="text-sm text-muted-color mb-1">{{ media.path }}</p>
                         <div class="flex gap-3 mb-1">
-                            <p class="text-xs text-muted-color">
-                                <i class="pi pi-clock mr-1"></i>{{ formatDuration(media.duration) }}
-                            </p>
-                            <p class="text-xs text-muted-color">
-                                <i class="pi pi-database mr-1"></i>{{ formatFileSize(media.size) }}
-                            </p>
+                            <p class="text-xs text-muted-color"><i class="pi pi-clock mr-1"></i>{{ formatDuration(media.duration) }}</p>
+                            <p class="text-xs text-muted-color"><i class="pi pi-database mr-1"></i>{{ formatFileSize(media.size) }}</p>
                         </div>
                         <p class="text-xs text-muted-color">Created: {{ formatDate(media.created_at) }}</p>
                     </div>
                     <div class="flex gap-2">
-                        <Button
-                            icon="pi pi-pencil"
-                            outlined
-                            rounded
-                            size="small"
-                            @click="openEditDialog(media)"
-                        />
-                        <Button
-                            icon="pi pi-trash"
-                            outlined
-                            rounded
-                            severity="danger"
-                            size="small"
-                            @click="confirmDelete(media)"
-                        />
+                        <Button icon="pi pi-pencil" outlined rounded size="small" @click="openEditDialog(media)" />
+                        <Button icon="pi pi-trash" outlined rounded severity="danger" size="small" @click="confirmDelete(media)" />
                     </div>
                 </div>
             </div>
         </div>
 
         <!-- Empty State -->
-        <div
-            v-if="!loading && mediaList.length === 0"
-            class="flex flex-col items-center justify-center py-12"
-        >
+        <div v-if="!loading && mediaList.length === 0" class="flex flex-col items-center justify-center py-12">
             <i class="pi pi-video text-6xl text-surface-400 mb-4"></i>
             <p class="text-xl text-muted-color mb-4">No media files found</p>
             <Button label="Add Your First Media" icon="pi pi-plus" @click="openCreateDialog" />
@@ -484,86 +386,42 @@ onMounted(() => {
             v-if="totalRecords > 0"
             :rows="lazyParams.limit"
             :totalRecords="totalRecords"
-            :rowsPerPageOptions="[12, 24, 48]"
             @page="onPage"
-            template="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink CurrentPageReport RowsPerPageDropdown"
+            template="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink CurrentPageReport"
             currentPageReportTemplate="Showing {first} to {last} of {totalRecords} media files"
         ></Paginator>
 
         <!-- Create/Edit Dialog -->
-        <Dialog
-            v-model:visible="displayDialog"
-            :header="isEditMode ? 'Edit Media' : 'Create Media'"
-            :modal="true"
-            :closable="true"
-            class="p-fluid"
-            style="width: 600px"
-        >
+        <Dialog v-model:visible="displayDialog" :header="isEditMode ? 'Edit Movie' : 'Create Movie'" :modal="true" :closable="true" class="p-fluid" style="width: 600px">
             <div class="flex flex-col gap-6 py-4">
                 <div class="flex flex-col gap-2">
                     <label for="name">Name *</label>
-                    <InputText
-                        id="name"
-                        v-model="formData.name"
-                        required="true"
-                        autofocus
-                        :class="{ 'p-invalid': !formData.name }"
-                    />
+                    <InputText id="name" v-model="formData.name" required="true" autofocus :class="{ 'p-invalid': !formData.name }" />
                 </div>
 
                 <div class="flex flex-col gap-2">
                     <label for="format">Format *</label>
-                    <Select
-                        id="format"
-                        v-model="formData.format"
-                        :options="formatOptions"
-                        optionLabel="label"
-                        optionValue="value"
-                        placeholder="Select a format"
-                        :class="{ 'p-invalid': !formData.format }"
-                    />
+                    <Select id="format" v-model="formData.format" :options="formatOptions" optionLabel="label" optionValue="value" placeholder="Select a format" :class="{ 'p-invalid': !formData.format }" />
                 </div>
 
                 <div class="flex flex-col gap-2">
                     <label for="path">File Path *</label>
                     <div class="flex gap-2">
-                        <InputText
-                            id="path"
-                            v-model="formData.path"
-                            readonly
-                            placeholder="Click 'Browse' to select a file"
-                            :class="{ 'p-invalid': !formData.path }"
-                            class="flex-1"
-                        />
-                        <Button
-                            icon="pi pi-folder-open"
-                            label="Browse"
-                            @click="openFileBrowser"
-                            outlined
-                        />
+                        <InputText id="path" v-model="formData.path" readonly placeholder="Click 'Browse' to select a file" :class="{ 'p-invalid': !formData.path }" class="flex-1" />
+                        <Button icon="pi pi-folder-open" label="Browse" @click="openFileBrowser" outlined />
                     </div>
                     <small class="text-muted-color">Select a video file from the server storage</small>
                 </div>
 
                 <div class="flex flex-col gap-2">
                     <label for="duration">Duration (seconds)</label>
-                    <InputNumber
-                        id="duration"
-                        v-model="formData.duration"
-                        :min="0"
-                        placeholder="Auto-detected if left empty"
-                    />
+                    <InputNumber id="duration" v-model="formData.duration" :min="0" placeholder="Auto-detected if left empty" />
                     <small class="text-muted-color">Optional - will be auto-detected from file if not provided</small>
                 </div>
 
                 <div class="flex flex-col gap-2">
                     <label for="size">File Size (bytes)</label>
-                    <InputNumber
-                        id="size"
-                        v-model="formData.size"
-                        :min="0"
-                        placeholder="Auto-detected if left empty"
-                    />
+                    <InputNumber id="size" v-model="formData.size" :min="0" placeholder="Auto-detected if left empty" />
                     <small class="text-muted-color">Optional - will be auto-detected from file if not provided</small>
                 </div>
 
@@ -572,24 +430,10 @@ onMounted(() => {
                     <div v-if="posterPreviewUrl" class="mb-3">
                         <div class="relative inline-block">
                             <img :src="posterPreviewUrl" alt="Poster preview" class="max-w-full h-48 rounded-border" />
-                            <Button
-                                icon="pi pi-times"
-                                rounded
-                                severity="danger"
-                                class="absolute top-2 right-2"
-                                @click="clearPoster"
-                            />
+                            <Button icon="pi pi-times" rounded severity="danger" class="absolute top-2 right-2" @click="clearPoster" />
                         </div>
                     </div>
-                    <FileUpload
-                        mode="basic"
-                        accept="image/*"
-                        :maxFileSize="5000000"
-                        :auto="false"
-                        chooseLabel="Choose Poster"
-                        @select="onPosterSelect"
-                        :disabled="uploadingPoster"
-                    />
+                    <FileUpload mode="basic" accept="image/*" :maxFileSize="5000000" :auto="false" chooseLabel="Choose Poster" @select="onPosterSelect" :disabled="uploadingPoster" />
                     <small class="text-muted-color">Max file size: 5MB. Supported: JPG, PNG, WEBP</small>
                 </div>
             </div>
@@ -601,17 +445,12 @@ onMounted(() => {
         </Dialog>
 
         <!-- Delete Confirmation Dialog -->
-        <Dialog
-            v-model:visible="displayDeleteDialog"
-            header="Confirm Delete"
-            :modal="true"
-            :closable="true"
-            style="width: 450px"
-        >
+        <Dialog v-model:visible="displayDeleteDialog" header="Confirm Delete" :modal="true" :closable="true" style="width: 450px">
             <div class="flex items-center gap-4">
                 <i class="pi pi-exclamation-triangle !text-3xl text-orange-500" />
                 <span v-if="selectedMedia">
-                    Are you sure you want to delete media <b>{{ selectedMedia.name }}</b>?
+                    Are you sure you want to delete media <b>{{ selectedMedia.name }}</b
+                    >?
                 </span>
             </div>
 
@@ -622,9 +461,6 @@ onMounted(() => {
         </Dialog>
 
         <!-- File Browser Dialog -->
-        <FileBrowser
-            v-model="formData.path"
-            v-model:visible="showFileBrowser"
-        />
+        <FileBrowser v-model="formData.path" v-model:visible="showFileBrowser" />
     </div>
 </template>

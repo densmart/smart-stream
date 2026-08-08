@@ -21,7 +21,7 @@ const uploadingPoster = ref(false);
 
 // Hierarchy navigation
 const currentParentId = ref(null);
-const breadcrumbs = ref([{ label: 'All Playlists', id: null }]);
+const breadcrumbs = ref([{ label: 'All Cartoons', id: null }]);
 
 // Parent playlist autocomplete
 const loadingPlaylists = ref(false);
@@ -30,7 +30,7 @@ const filteredPlaylists = ref([]);
 // Form data
 const formData = ref({
     name: '',
-    type: PlaylistType.SERIES,
+    type: PlaylistType.CARTOON,
     poster: null,
     parent_id: null
 });
@@ -53,17 +53,12 @@ const selectedMediaToRemove = ref([]);
 // Pagination
 const lazyParams = ref({
     page: 1,
-    limit: 12,
+    limit: 24,
     search: ''
 });
 
-// Playlist type options
-const typeOptions = [
-    { label: 'Series', value: PlaylistType.SERIES },
-    { label: 'Franchise', value: PlaylistType.FRANCHISE },
-    { label: 'Season', value: PlaylistType.SEASON },
-    { label: 'Cartoon', value: PlaylistType.CARTOON }
-];
+// Search functionality
+const searchQuery = ref('');
 
 // Methods
 const loadPlaylists = async () => {
@@ -72,7 +67,8 @@ const loadPlaylists = async () => {
         const params = {
             offset: (lazyParams.value.page - 1) * lazyParams.value.limit,
             limit: lazyParams.value.limit,
-            name: lazyParams.value.search || undefined
+            name: lazyParams.value.search || undefined,
+            type: PlaylistType.CARTOON
         };
 
         // Add parent_id filter if we're viewing children
@@ -87,7 +83,7 @@ const loadPlaylists = async () => {
         toast.add({
             severity: 'error',
             summary: 'Error',
-            detail: error.response?.data?.error || 'Failed to load playlists',
+            detail: error.response?.data?.error || 'Failed to load cartoons',
             life: 3000
         });
     } finally {
@@ -97,7 +93,13 @@ const loadPlaylists = async () => {
 
 const onPage = (event) => {
     lazyParams.value.page = event.page + 1;
-    lazyParams.value.limit = event.rows;
+    loadPlaylists();
+};
+
+// Search handler
+const onSearch = () => {
+    lazyParams.value.search = searchQuery.value;
+    lazyParams.value.page = 1;
     loadPlaylists();
 };
 
@@ -122,14 +124,14 @@ const searchPlaylists = async (event) => {
     try {
         loadingPlaylists.value = true;
         const query = event.query;
-        // Call new search API endpoint with name parameter
-        const results = await playlistsApi.searchPlaylists(query || undefined);
+        // Call new search API endpoint with name parameter and type filter
+        const results = await playlistsApi.searchPlaylists(query || undefined, PlaylistType.CARTOON);
         filteredPlaylists.value = results;
     } catch (error) {
         toast.add({
             severity: 'error',
             summary: 'Error',
-            detail: 'Failed to search playlists',
+            detail: 'Failed to search cartoons',
             life: 3000
         });
         filteredPlaylists.value = [];
@@ -142,7 +144,7 @@ const openCreateDialog = () => {
     isEditMode.value = false;
     formData.value = {
         name: '',
-        type: PlaylistType.SERIES,
+        type: PlaylistType.CARTOON,
         poster: null,
         parent_id: null
     };
@@ -198,11 +200,11 @@ const clearPoster = () => {
 };
 
 const savePlaylist = async () => {
-    if (!formData.value.name || !formData.value.type) {
+    if (!formData.value.name) {
         toast.add({
             severity: 'warn',
             summary: 'Validation Error',
-            detail: 'Name and type are required',
+            detail: 'Name is required',
             life: 3000
         });
         return;
@@ -234,7 +236,7 @@ const savePlaylist = async () => {
         if (isEditMode.value) {
             const updateData = {
                 name: formData.value.name,
-                type: formData.value.type
+                type: PlaylistType.CARTOON
             };
 
             // Only include poster if it was changed
@@ -249,20 +251,20 @@ const savePlaylist = async () => {
             toast.add({
                 severity: 'success',
                 summary: 'Success',
-                detail: 'Playlist updated successfully',
+                detail: 'Cartoon updated successfully',
                 life: 3000
             });
         } else {
             await playlistsApi.createPlaylist({
                 name: formData.value.name,
-                type: formData.value.type,
+                type: PlaylistType.CARTOON,
                 poster: posterPath,
                 parent_id: formData.value.parent_id?.id || null
             });
             toast.add({
                 severity: 'success',
                 summary: 'Success',
-                detail: 'Playlist created successfully',
+                detail: 'Cartoon created successfully',
                 life: 3000
             });
         }
@@ -273,7 +275,7 @@ const savePlaylist = async () => {
         toast.add({
             severity: 'error',
             summary: 'Error',
-            detail: error.response?.data?.error || 'Failed to save playlist',
+            detail: error.response?.data?.error || 'Failed to save cartoon',
             life: 3000
         });
     } finally {
@@ -293,7 +295,7 @@ const deletePlaylist = async () => {
         toast.add({
             severity: 'success',
             summary: 'Success',
-            detail: 'Playlist deleted successfully',
+            detail: 'Cartoon deleted successfully',
             life: 3000
         });
         displayDeleteDialog.value = false;
@@ -303,7 +305,7 @@ const deletePlaylist = async () => {
         toast.add({
             severity: 'error',
             summary: 'Error',
-            detail: error.response?.data?.error || 'Failed to delete playlist',
+            detail: error.response?.data?.error || 'Failed to delete cartoon',
             life: 3000
         });
     } finally {
@@ -349,7 +351,7 @@ const openMediaDialog = async (playlist) => {
         toast.add({
             severity: 'warn',
             summary: 'Cannot Manage Media',
-            detail: 'Media can only be added to playlists without children. This playlist contains child playlists.',
+            detail: 'Media can only be added to cartoons without children. This cartoon contains child playlists.',
             life: 5000
         });
         return;
@@ -420,7 +422,7 @@ const addMediaToPlaylist = async () => {
         toast.add({
             severity: 'success',
             summary: 'Success',
-            detail: `Added ${selectedMediaToAdd.value.length} media to playlist`,
+            detail: `Added ${selectedMediaToAdd.value.length} media to cartoon`,
             life: 3000
         });
 
@@ -464,7 +466,7 @@ const removeMediaFromPlaylist = async () => {
         toast.add({
             severity: 'success',
             summary: 'Success',
-            detail: `Removed ${selectedMediaToRemove.value.length} media from playlist`,
+            detail: `Removed ${selectedMediaToRemove.value.length} media from cartoon`,
             life: 3000
         });
 
@@ -542,26 +544,6 @@ const getPosterUrl = (posterPath) => {
     return uploadApi.getPosterUrl(posterPath);
 };
 
-const getTypeLabel = (type) => {
-    const option = typeOptions.find((opt) => opt.value === type);
-    return option ? option.label : type;
-};
-
-const getTypeSeverity = (type) => {
-    switch (type) {
-        case PlaylistType.SERIES:
-            return 'success';
-        case PlaylistType.FRANCHISE:
-            return 'info';
-        case PlaylistType.SEASON:
-            return 'warn';
-        case PlaylistType.CARTOON:
-            return 'warn';
-        default:
-            return 'secondary';
-    }
-};
-
 const openPosterDialog = (posterPath) => {
     if (posterPath) {
         selectedPosterUrl.value = getPosterUrl(posterPath);
@@ -579,8 +561,16 @@ onMounted(() => {
         <Toast />
 
         <div class="flex justify-between items-center mb-6">
-            <h5 class="mb-0">Playlists Management</h5>
-            <Button label="Add Playlist" icon="pi pi-plus" @click="openCreateDialog" />
+            <h5 class="mb-0">Cartoons Management</h5>
+            <Button label="Add Cartoon" icon="pi pi-plus" @click="openCreateDialog" />
+        </div>
+
+        <!-- Search Field -->
+        <div class="mb-4">
+            <IconField>
+                <InputIcon class="pi pi-search" />
+                <InputText v-model="searchQuery" placeholder="Search..." @keyup.enter="onSearch" @input="onSearch" class="w-full md:w-96" />
+            </IconField>
         </div>
 
         <!-- Breadcrumb Navigation -->
@@ -610,7 +600,7 @@ onMounted(() => {
                         <div v-else class="w-full h-48 bg-surface-100 dark:bg-surface-700 rounded-border flex items-center justify-center">
                             <i class="pi pi-list text-6xl text-surface-400"></i>
                         </div>
-                        <Tag :value="getTypeLabel(playlist.type)" :severity="getTypeSeverity(playlist.type)" class="absolute top-2 right-2" />
+                        <Tag value="Cartoon" severity="warn" class="absolute top-2 right-2" />
                     </div>
                     <div class="mb-3">
                         <h6 class="mb-1">{{ playlist.name }}</h6>
@@ -629,8 +619,8 @@ onMounted(() => {
         <!-- Empty State -->
         <div v-if="!loading && playlists.length === 0" class="flex flex-col items-center justify-center py-12">
             <i class="pi pi-list text-6xl text-surface-400 mb-4"></i>
-            <p class="text-xl text-muted-color mb-4">No playlists found</p>
-            <Button label="Create Your First Playlist" icon="pi pi-plus" @click="openCreateDialog" />
+            <p class="text-xl text-muted-color mb-4">No cartoons found</p>
+            <Button label="Create Your First Cartoon" icon="pi pi-plus" @click="openCreateDialog" />
         </div>
 
         <!-- Loading State -->
@@ -643,14 +633,13 @@ onMounted(() => {
             v-if="totalRecords > 0"
             :rows="lazyParams.limit"
             :totalRecords="totalRecords"
-            :rowsPerPageOptions="[12, 24, 48]"
             @page="onPage"
-            template="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink CurrentPageReport RowsPerPageDropdown"
-            currentPageReportTemplate="Showing {first} to {last} of {totalRecords} playlists"
+            template="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink CurrentPageReport"
+            currentPageReportTemplate="Showing {first} to {last} of {totalRecords} cartoons"
         ></Paginator>
 
         <!-- Create/Edit Dialog -->
-        <Dialog v-model:visible="displayDialog" :header="isEditMode ? 'Edit Playlist' : 'Create Playlist'" :modal="true" :closable="true" class="p-fluid" style="width: 600px">
+        <Dialog v-model:visible="displayDialog" :header="isEditMode ? 'Edit Cartoon' : 'Create Cartoon'" :modal="true" :closable="true" class="p-fluid" style="width: 600px">
             <div class="flex flex-col gap-6 py-4">
                 <div class="flex flex-col gap-2">
                     <label for="name">Name *</label>
@@ -658,13 +647,8 @@ onMounted(() => {
                 </div>
 
                 <div class="flex flex-col gap-2">
-                    <label for="type">Type *</label>
-                    <Select id="type" v-model="formData.type" :options="typeOptions" optionLabel="label" optionValue="value" placeholder="Select a type" :class="{ 'p-invalid': !formData.type }" />
-                </div>
-
-                <div class="flex flex-col gap-2">
                     <label for="parent">Parent Playlist (optional)</label>
-                    <AutoComplete id="parent" v-model="formData.parent_id" :suggestions="filteredPlaylists" @complete="searchPlaylists" optionLabel="name" placeholder="Search parent playlist..." :loading="loadingPlaylists">
+                    <AutoComplete id="parent" v-model="formData.parent_id" :suggestions="filteredPlaylists" @complete="searchPlaylists" optionLabel="name" placeholder="Search parent cartoon..." :loading="loadingPlaylists">
                         <template #option="slotProps">
                             <div class="flex items-center gap-2">
                                 <i class="pi pi-list text-surface-500"></i>
@@ -672,7 +656,7 @@ onMounted(() => {
                             </div>
                         </template>
                     </AutoComplete>
-                    <small class="text-muted-color">Leave empty to make this a root-level playlist</small>
+                    <small class="text-muted-color">Leave empty to make this a root-level cartoon</small>
                 </div>
 
                 <div class="flex flex-col gap-2">
@@ -699,7 +683,7 @@ onMounted(() => {
             <div class="flex items-center gap-4">
                 <i class="pi pi-exclamation-triangle !text-3xl text-orange-500" />
                 <span v-if="selectedPlaylist">
-                    Are you sure you want to delete playlist <b>{{ selectedPlaylist.name }}</b
+                    Are you sure you want to delete cartoon <b>{{ selectedPlaylist.name }}</b
                     >?
                 </span>
             </div>
@@ -711,7 +695,7 @@ onMounted(() => {
         </Dialog>
 
         <!-- Media Management Dialog -->
-        <Dialog v-model:visible="displayMediaDialog" header="Manage Playlist Media" :modal="true" :closable="true" class="p-fluid" style="width: 900px; max-width: 95vw">
+        <Dialog v-model:visible="displayMediaDialog" header="Manage Cartoon Media" :modal="true" :closable="true" class="p-fluid" style="width: 900px; max-width: 95vw">
             <div v-if="selectedPlaylist" class="mb-4">
                 <h6>{{ selectedPlaylist.name }}</h6>
             </div>
@@ -762,7 +746,7 @@ onMounted(() => {
                 <!-- Media in Playlist -->
                 <div class="col-span-2 md:col-span-1">
                     <div class="flex justify-between items-center mb-3">
-                        <h6 class="mb-0">Media in Playlist ({{ playlistMedia.length }})</h6>
+                        <h6 class="mb-0">Media in Cartoon ({{ playlistMedia.length }})</h6>
                         <Button label="Remove Selected" icon="pi pi-minus" size="small" severity="danger" @click="removeMediaFromPlaylist" :disabled="loadingMedia || selectedMediaToRemove.length === 0" />
                     </div>
                     <div v-if="loadingMedia" class="flex justify-center py-8">
@@ -783,7 +767,7 @@ onMounted(() => {
                             </template>
                         </Column>
                     </DataTable>
-                    <p v-if="!loadingMedia && playlistMedia.length === 0" class="text-center text-muted-color py-4">No media in this playlist</p>
+                    <p v-if="!loadingMedia && playlistMedia.length === 0" class="text-center text-muted-color py-4">No media in this cartoon</p>
                 </div>
             </div>
 

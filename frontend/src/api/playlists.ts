@@ -12,7 +12,8 @@ export const playlistsApi = {
   getPlaylists: async (params?: {
     page?: number
     limit?: number
-    search?: string
+    offset?: number
+    name?: string
     type?: string
     parent_id?: string
     include_all_hierarchy?: boolean
@@ -28,7 +29,7 @@ export const playlistsApi = {
 
   getPlaylistChildren: async (
     id: string,
-    params?: { page?: number; limit?: number; search?: string }
+    params?: { page?: number; limit?: number; offset?: number; name?: string }
   ): Promise<PaginatedResponse<Playlist>> => {
     const response = await apiClient.get<PaginatedResponse<Playlist>>(`/playlists/${id}/children/`, {
       params
@@ -99,9 +100,13 @@ export const playlistsApi = {
   },
 
   // Autocomplete search
-  searchPlaylists: async (name?: string): Promise<Array<{ id: string; name: string }>> => {
+  searchPlaylists: async (name?: string, type?: string): Promise<Array<{ id: string; name: string }>> => {
+    const params: { name?: string; type?: string } = {}
+    if (name) params.name = name
+    if (type) params.type = type
+
     const response = await apiClient.get<Array<{ id: string; name: string }>>('/playlists/search/', {
-      params: name ? { name } : undefined
+      params: Object.keys(params).length > 0 ? params : undefined
     })
     return response.data
   }

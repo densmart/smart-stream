@@ -76,7 +76,8 @@ export interface UpdateMediaRequest {
 export enum PlaylistType {
   SERIES = 'series',
   FRANCHISE = 'franchise',
-  SEASON = 'season'
+  SEASON = 'season',
+  CARTOON = 'cartoon'
 }
 
 export interface Playlist {

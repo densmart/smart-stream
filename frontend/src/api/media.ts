@@ -12,8 +12,10 @@ export const mediaApi = {
   getMedia: async (params?: {
     page?: number
     limit?: number
-    search?: string
+    offset?: number
+    name?: string
     format?: string
+    only_unassigned?: boolean
   }): Promise<PaginatedResponse<Media>> => {
     const response = await apiClient.get<PaginatedResponse<Media>>('/media/', { params })
     return response.data

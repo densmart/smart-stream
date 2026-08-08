@@ -31,6 +31,21 @@ const router = createRouter({
                     component: () => import('@/views/pages/Playlists.vue')
                 },
                 {
+                    path: '/series',
+                    name: 'series',
+                    component: () => import('@/views/pages/Series.vue')
+                },
+                {
+                    path: '/franchises',
+                    name: 'franchises',
+                    component: () => import('@/views/pages/Franchises.vue')
+                },
+                {
+                    path: '/cartoons',
+                    name: 'cartoons',
+                    component: () => import('@/views/pages/Cartoons.vue')
+                },
+                {
                     path: '/uikit/formlayout',
                     name: 'formlayout',
                     component: () => import('@/views/uikit/FormLayout.vue')

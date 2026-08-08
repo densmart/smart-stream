@@ -259,47 +259,22 @@ onMounted(() => {
         </DataTable>
 
         <!-- Create/Edit Dialog -->
-        <Dialog
-            v-model:visible="displayDialog"
-            :header="isEditMode ? 'Edit Client' : 'Create Client'"
-            :modal="true"
-            :closable="true"
-            class="p-fluid"
-            style="width: 450px"
-        >
+        <Dialog v-model:visible="displayDialog" :header="isEditMode ? 'Edit Client' : 'Create Client'" :modal="true" :closable="true" class="p-fluid" style="width: 450px">
             <div class="flex flex-col gap-6 py-4">
                 <div class="flex flex-col gap-2">
                     <label for="login">Login</label>
-                    <InputText
-                        id="login"
-                        v-model="formData.login"
-                        required="true"
-                        autofocus
-                        :class="{ 'p-invalid': !formData.login }"
-                    />
+                    <InputText id="login" v-model="formData.login" required="true" autofocus :class="{ 'p-invalid': !formData.login }" />
                 </div>
 
                 <div class="flex flex-col gap-2">
                     <label for="email">Email (optional)</label>
-                    <InputText
-                        id="email"
-                        v-model="formData.email"
-                        type="email"
-                        :class="{ 'p-invalid': formData.email && !isValidEmail(formData.email) }"
-                    />
+                    <InputText id="email" v-model="formData.email" type="email" :class="{ 'p-invalid': formData.email && !isValidEmail(formData.email) }" />
                     <small v-if="formData.email && !isValidEmail(formData.email)" class="p-error">Please enter a valid email address</small>
                 </div>
 
                 <div class="flex flex-col gap-2">
                     <label for="password">Password {{ isEditMode ? '(leave empty to keep current)' : '' }}</label>
-                    <Password
-                        id="password"
-                        v-model="formData.password"
-                        toggleMask
-                        :required="!isEditMode"
-                        :class="{ 'p-invalid': !isEditMode && !formData.password }"
-                        :feedback="false"
-                    />
+                    <Password id="password" v-model="formData.password" toggleMask :required="!isEditMode" :class="{ 'p-invalid': !isEditMode && !formData.password }" :feedback="false" />
                 </div>
 
                 <div class="flex items-center gap-2">
@@ -315,17 +290,12 @@ onMounted(() => {
         </Dialog>
 
         <!-- Delete Confirmation Dialog -->
-        <Dialog
-            v-model:visible="displayDeleteDialog"
-            header="Confirm Delete"
-            :modal="true"
-            :closable="true"
-            style="width: 450px"
-        >
+        <Dialog v-model:visible="displayDeleteDialog" header="Confirm Delete" :modal="true" :closable="true" style="width: 450px">
             <div class="flex items-center gap-4">
                 <i class="pi pi-exclamation-triangle !text-3xl text-orange-500" />
                 <span v-if="selectedClient">
-                    Are you sure you want to delete client <b>{{ selectedClient.login }}</b>?
+                    Are you sure you want to delete client <b>{{ selectedClient.login }}</b
+                    >?
                 </span>
             </div>
 

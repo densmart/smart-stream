@@ -68,26 +68,10 @@ const handleSignIn = async () => {
                         <Message v-if="errorMessage" severity="error" :closable="false" class="mb-4">{{ errorMessage }}</Message>
 
                         <label for="login1" class="block text-surface-900 dark:text-surface-0 text-xl font-medium mb-2">Login</label>
-                        <InputText
-                            id="login1"
-                            type="text"
-                            placeholder="Enter your login"
-                            class="w-full md:w-[30rem] mb-8"
-                            v-model="login"
-                            @keyup.enter="handleSignIn"
-                        />
+                        <InputText id="login1" type="text" placeholder="Enter your login" class="w-full md:w-[30rem] mb-8" v-model="login" @keyup.enter="handleSignIn" />
 
                         <label for="password1" class="block text-surface-900 dark:text-surface-0 font-medium text-xl mb-2">Password</label>
-                        <Password
-                            id="password1"
-                            v-model="password"
-                            placeholder="Password"
-                            :toggleMask="true"
-                            class="mb-4"
-                            fluid
-                            :feedback="false"
-                            @keyup.enter="handleSignIn"
-                        />
+                        <Password id="password1" v-model="password" placeholder="Password" :toggleMask="true" class="mb-4" fluid :feedback="false" @keyup.enter="handleSignIn" />
 
                         <div class="flex items-center justify-between mt-2 mb-8 gap-8">
                             <div class="flex items-center">
@@ -95,12 +79,7 @@ const handleSignIn = async () => {
                                 <label for="rememberme1">Remember me</label>
                             </div>
                         </div>
-                        <Button
-                            label="Sign In"
-                            class="w-full"
-                            @click="handleSignIn"
-                            :loading="loading"
-                        />
+                        <Button label="Sign In" class="w-full" @click="handleSignIn" :loading="loading" />
                     </div>
                 </div>
             </div>

@@ -15,6 +15,8 @@ import android.app.AlertDialog
 import com.google.android.exoplayer2.upstream.DataSource
 import com.google.android.exoplayer2.upstream.DefaultDataSource
 import com.google.android.exoplayer2.upstream.DefaultHttpDataSource
+import com.google.android.exoplayer2.DefaultLoadControl
+import com.google.android.exoplayer2.C
 import com.smartstream.tvclient.R
 import com.smartstream.tvclient.data.repository.MediaRepository
 import com.smartstream.tvclient.utils.SharedPrefsManager
@@ -130,11 +132,26 @@ class PlayerActivity : FragmentActivity() {
             }
             Log.d(TAG, "initializePlayer: TrackSelector created with language preferences")
 
+            // Create LoadControl with reduced buffer sizes to save memory
+            Log.d(TAG, "initializePlayer: Creating LoadControl with reduced buffer sizes")
+            val loadControl = DefaultLoadControl.Builder()
+                .setBufferDurationsMs(
+                    15000,  // Min buffer: 15 seconds (default 50s)
+                    30000,  // Max buffer: 30 seconds (default 50s)
+                    1500,   // Buffer for playback: 1.5 seconds (default 2.5s)
+                    5000    // Buffer for playback after rebuffer: 5 seconds (default 5s)
+                )
+                .setTargetBufferBytes(C.LENGTH_UNSET) // Use default
+                .setPrioritizeTimeOverSizeThresholds(true) // Prioritize time over buffer size
+                .build()
+            Log.d(TAG, "initializePlayer: LoadControl created")
+
             // Create player
             Log.d(TAG, "initializePlayer: Creating ExoPlayer instance")
             player = ExoPlayer.Builder(this)
                 .setMediaSourceFactory(DefaultMediaSourceFactory(dataSourceFactory))
                 .setTrackSelector(trackSelector)
+                .setLoadControl(loadControl)
                 .build()
                 .also { exoPlayer ->
                     Log.d(TAG, "initializePlayer: ExoPlayer instance created")

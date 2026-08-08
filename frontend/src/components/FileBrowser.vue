@@ -55,7 +55,6 @@ const loadDirectory = async (path = '') => {
         const response = await mediaApi.browseMediaFiles(path);
         items.value = response.result.items || [];
         currentPath.value = response.result.current_path || '';
-
     } catch (error) {
         toast.add({
             severity: 'error',
@@ -104,55 +103,45 @@ const formatFileSize = (bytes) => {
 };
 
 // Watch for dialog visibility
-watch(() => props.visible, (newVal) => {
-    if (newVal) {
-        selectedFile.value = null;
+watch(
+    () => props.visible,
+    (newVal) => {
+        if (newVal) {
+            selectedFile.value = null;
 
-        // Если есть текущий путь к файлу, открываем папку с этим файлом
-        if (props.modelValue) {
-            // Убираем начальный слеш если есть
-            let path = props.modelValue.startsWith('/')
-                ? props.modelValue.substring(1)
-                : props.modelValue;
+            // Если есть текущий путь к файлу, открываем папку с этим файлом
+            if (props.modelValue) {
+                // Убираем начальный слеш если есть
+                let path = props.modelValue.startsWith('/') ? props.modelValue.substring(1) : props.modelValue;
 
-            // Извлекаем путь к директории (убираем имя файла)
-            const parts = path.split('/');
-            if (parts.length > 1) {
-                parts.pop(); // Убираем последний элемент (имя файла)
-                const dirPath = parts.join('/');
-                loadDirectory(dirPath);
+                // Извлекаем путь к директории (убираем имя файла)
+                const parts = path.split('/');
+                if (parts.length > 1) {
+                    parts.pop(); // Убираем последний элемент (имя файла)
+                    const dirPath = parts.join('/');
+                    loadDirectory(dirPath);
+                } else {
+                    // Файл в корне
+                    loadDirectory('');
+                }
             } else {
-                // Файл в корне
+                // Нет пути - открываем корень
+                currentPath.value = '';
                 loadDirectory('');
             }
-        } else {
-            // Нет пути - открываем корень
-            currentPath.value = '';
-            loadDirectory('');
         }
     }
-});
+);
 </script>
 
 <template>
-    <Dialog
-        :visible="visible"
-        @update:visible="emit('update:visible', $event)"
-        header="Select Media File"
-        :modal="true"
-        :closable="true"
-        :style="{ width: '800px', maxHeight: '80vh' }"
-        class="file-browser-dialog"
-    >
+    <Dialog :visible="visible" @update:visible="emit('update:visible', $event)" header="Select Media File" :modal="true" :closable="true" :style="{ width: '800px', maxHeight: '80vh' }" class="file-browser-dialog">
         <div class="flex flex-col gap-4">
             <!-- Breadcrumb Navigation -->
             <div class="breadcrumb-wrapper">
                 <Breadcrumb :model="breadcrumbs" class="mb-0">
                     <template #item="{ item }">
-                        <a
-                            class="cursor-pointer text-primary hover:underline"
-                            @click.prevent="navigateToBreadcrumb(item.path)"
-                        >
+                        <a class="cursor-pointer text-primary hover:underline" @click.prevent="navigateToBreadcrumb(item.path)">
                             {{ item.label }}
                         </a>
                     </template>
@@ -169,7 +158,7 @@ watch(() => props.visible, (newVal) => {
                 <p class="text-muted-color">No files or folders found</p>
             </div>
 
-            <div v-else class="file-list-container" style="max-height: 400px; overflow-y: auto;">
+            <div v-else class="file-list-container" style="max-height: 400px; overflow-y: auto">
                 <DataView :value="items" layout="list">
                     <template #list="{ items }">
                         <div class="flex flex-col gap-2">
@@ -184,25 +173,15 @@ watch(() => props.visible, (newVal) => {
                                 @click="handleItemClick(item)"
                             >
                                 <div class="flex items-center gap-3">
-                                    <i
-                                        :class="item.type === 'directory' ? 'pi pi-folder text-yellow-500' : 'pi pi-file-video text-blue-500'"
-                                        class="text-2xl"
-                                    ></i>
+                                    <i :class="item.type === 'directory' ? 'pi pi-folder text-yellow-500' : 'pi pi-file-video text-blue-500'" class="text-2xl"></i>
                                     <div class="flex-1">
                                         <div class="font-semibold">{{ item.name }}</div>
                                         <div class="text-sm text-muted-color flex gap-4">
-                                            <span v-if="item.type === 'file' && item.format">
-                                                Format: {{ item.format.toUpperCase() }}
-                                            </span>
-                                            <span v-if="item.type === 'file' && item.size">
-                                                Size: {{ formatFileSize(item.size) }}
-                                            </span>
+                                            <span v-if="item.type === 'file' && item.format"> Format: {{ item.format.toUpperCase() }} </span>
+                                            <span v-if="item.type === 'file' && item.size"> Size: {{ formatFileSize(item.size) }} </span>
                                         </div>
                                     </div>
-                                    <i
-                                        v-if="item.type === 'directory'"
-                                        class="pi pi-chevron-right text-muted-color"
-                                    ></i>
+                                    <i v-if="item.type === 'directory'" class="pi pi-chevron-right text-muted-color"></i>
                                 </div>
                             </div>
                         </div>
@@ -212,18 +191,8 @@ watch(() => props.visible, (newVal) => {
         </div>
 
         <template #footer>
-            <Button
-                label="Cancel"
-                icon="pi pi-times"
-                text
-                @click="closeDialog"
-            />
-            <Button
-                label="Select"
-                icon="pi pi-check"
-                @click="confirmSelection"
-                :disabled="!canSelectFile"
-            />
+            <Button label="Cancel" icon="pi pi-times" text @click="closeDialog" />
+            <Button label="Select" icon="pi pi-check" @click="confirmSelection" :disabled="!canSelectFile" />
         </template>
     </Dialog>
 </template>

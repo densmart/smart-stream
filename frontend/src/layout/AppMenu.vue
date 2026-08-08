@@ -22,14 +22,24 @@ const model = ref([
                 to: '/clients'
             },
             {
-                label: 'Media',
+                label: 'Movies',
                 icon: 'pi pi-fw pi-video',
                 to: '/media'
             },
             {
-                label: 'Playlists',
+                label: 'Series',
                 icon: 'pi pi-fw pi-list',
-                to: '/playlists'
+                to: '/series'
+            },
+            {
+                label: 'Franchises',
+                icon: 'pi pi-fw pi-folder',
+                to: '/franchises'
+            },
+            {
+                label: 'Cartoons',
+                icon: 'pi pi-fw pi-star',
+                to: '/cartoons'
             }
         ]
     }

@@ -87,18 +87,15 @@ func (r *ClientAPIRouter) getPlaylistChildren(c *gin.Context) {
 // getPlaylistMedia возвращает список медиа в конкретном плейлисте
 func (r *ClientAPIRouter) getPlaylistMedia(c *gin.Context) {
 	playlistID := c.Param("id")
-	var data dto.SearchMediaDTO
+	var filter dto.SearchMediaDTO
 
-	if err := c.BindQuery(&data); err != nil {
+	if err := c.BindQuery(&filter); err != nil {
 		logger.Debugf("[client api] getPlaylistMedia bind query error: %s", err.Error())
 		ErrorResponse(c, http.StatusBadRequest, "Invalid query parameters")
 		return
 	}
 
-	// Фильтруем по playlist_id
-	data.PlaylistID = &playlistID
-
-	media, totals, ucErr := usecases.SearchMedia(*r.oltp, data)
+	media, total, ucErr := usecases.GetPlaylistMedia(*r.oltp, playlistID, filter)
 	if ucErr != nil {
 		logger.Debugf("[client api] getPlaylistMedia error: %s", ucErr.Message)
 		ErrorResponse(c, ucErr.HttpCode, ucErr.Message)
@@ -122,6 +119,6 @@ func (r *ClientAPIRouter) getPlaylistMedia(c *gin.Context) {
 		results = append(results, result)
 	}
 
-	paginator := NewPaginator(data.BaseSearchRequestDTO, totals)
+	paginator := NewPaginator(filter.BaseSearchRequestDTO, total)
 	SuccessResponseSearch(c, results, paginator.ToRepresentation())
 }
